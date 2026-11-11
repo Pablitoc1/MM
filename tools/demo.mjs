@@ -53,6 +53,15 @@ const SHOTS = {
     { name: '02-jungle-3m00', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 180 }] },
     { name: '03-farm-10m00', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 600 }] },
   ],
+  // Draft (M7, en avance) : KC contre G2, le joueur suit le conseil du coach (draft-demo.json).
+  draft: [
+    { name: '01-premier-ban', steps: [{ click: 'Draft' }] },
+    { name: '02-premier-pick', steps: [{ click: 'Draft' }, ...Array(3).fill({ click: 'Déléguer' })] },
+    { name: '03-picks-1', steps: [{ click: 'Draft' }, ...Array(5).fill({ click: 'Déléguer' })] },
+    { name: '04-bans-2', steps: [{ click: 'Draft' }, ...Array(6).fill({ click: 'Déléguer' })] },
+    { name: '05-dernier-pick', steps: [{ click: 'Draft' }, ...Array(9).fill({ click: 'Déléguer' })] },
+    { name: '06-draft-terminee', steps: [{ click: 'Draft' }, ...Array(10).fill({ click: 'Déléguer' })] },
+  ],
   // Vue 2D du match (préparation de M6), sur le faux match KC contre G2.
   'vue-2d': [
     { name: '01-debut-0m45', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 45 }] },
@@ -114,6 +123,7 @@ for (const shot of shots) {
     }
     await page.waitForLoadState('networkidle');
   }
+  await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('main')?.scrollTo(0, 0); });
   await page.evaluate(() => document.fonts.ready);
   // Attend que toutes les images (photos, logos, champions) soient chargées.
   await page.waitForFunction(() => [...document.images].every((i) => i.complete));
