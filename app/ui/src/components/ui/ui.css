@@ -188,3 +188,44 @@
 .ui-moments { list-style: none; margin: 0; padding: 0; }
 .ui-moments li { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 5px 0; }
 .ui-moments__time { font-family: var(--font-title); font-weight: 700; width: 44px; }
+
+/* Classes partagées par les écrans complets des maquettes v2 (préfixe m-). */
+/* Les maquettes gardent la boîte par défaut du navigateur : on la rétablit dans leurs écrans. */
+.m-screen * { box-sizing: content-box; }
+:where(.m-screen) button { font: revert; }
+.m-card { background: var(--bg-card); border-radius: var(--radius); padding: 20px; box-sizing: border-box; min-width: 0; }
+.m-h2 { margin: 0 0 10px; font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.m-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 6px 0; }
+.m-btn { min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border-strong); background: transparent; color: var(--text); font-size: 14px; font-family: inherit; }
+.m-btn.m-on { border-color: var(--team-us); background: var(--bg-active); }
+.m-cta { min-height: 44px; padding: 0 24px; border: none; border-radius: 8px; background: var(--team-us); color: var(--bg-page); font-weight: 700; font-size: 15px; font-family: inherit; }
+.m-muted { color: var(--text-muted); }
+.m-teal { color: var(--teal-text); }
+.m-orange { color: var(--team-them); }
+.m-note { margin: 0; font-size: 13px; color: var(--text-muted); }
+:where(.m-screen) a { color: var(--teal-text); }
+:where(.m-screen) a:hover { color: var(--teal-hover); }
+@keyframes m-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.m-pulse { animation: m-pulse 1.6s ease-in-out infinite; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { .m-pulse { animation: none; } }
+.m-table td, .m-table th { padding: 9px 7px; border-bottom: 1px solid var(--border); font-size: 13px; text-align: left; vertical-align: middle; white-space: nowrap; }
+.m-table th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
+.m-table tr:hover td { background: var(--row-hover); }
+.m-plan td { padding: 3px; vertical-align: top; width: 13%; }
+.m-plan th { padding: 4px 3px 8px; font-weight: 500; color: var(--text-muted); }
+.m-sb td, .m-sb th { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; text-align: left; white-space: nowrap; vertical-align: middle; }
+.m-sb th { color: var(--text-muted); font-weight: 500; font-size: 11px; }
+
+/* Cadre de l'application : barre du haut et menu (maquettes v2). */
+.m-screen { min-height: 100vh; font-size: 16px; background: var(--bg-page); color: var(--text); font-family: var(--font-body); display: flex; flex-direction: column; }
+.m-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 24px; background: var(--bg-bar); border-bottom: 1px solid var(--border); }
+.m-top__club { display: flex; align-items: center; gap: 10px; }
+.m-top__name { font-family: var(--font-title); font-weight: 700; font-size: 17px; }
+.m-top__info { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; font-size: 14px; color: var(--text-muted); }
+.m-top__item { display: flex; align-items: center; gap: 8px; }
+.m-top__item strong { color: var(--text); }
+.m-body { display: flex; flex: 1; min-width: 0; }
+.m-nav { flex: 0 0 210px; background: var(--bg-bar); padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; }
+.m-nav__item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px; text-decoration: none; color: var(--text-muted); }
+.m-nav__item--on { background: var(--bg-active); color: var(--text); font-weight: 600; }
+.m-nav__badge { margin-left: auto; background: var(--team-them); color: var(--bg-page); border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; }

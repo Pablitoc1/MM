@@ -51,6 +51,17 @@
   --tower-light: #5a6378;
   --tower-top: #6b7488;
 
+  /* Couleurs des écrans complets des maquettes v2. */
+  --text-dim: #5b6b86;      /* texte secondaire très discret */
+  --accent-violet: #9b8ae0; /* méta, champions à la mode */
+  --violet-bg: #2e2a44;
+  --teal-bg: #1d3b3f;       /* fond teal sombre (renforcé) */
+  --teal-hover: #8fe3da;    /* lien survolé */
+  --gold-bg: #3a2f22;       /* fond doré sombre */
+  --bg-raised: #26304a;     /* case surélevée */
+  --danger: #e5534b;        /* blessure, défaite lourde */
+  --white: #ffffff;
+
   --font-body: 'Inter', system-ui, sans-serif;
   --font-title: 'Space Grotesk', 'Inter', sans-serif;
   --radius: 12px;
@@ -65,6 +76,6 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
-a { color: #5fd4c8; }
+a { color: var(--teal-text); }
 button { font: inherit; }
 :focus-visible { outline: 2px solid var(--team-us); outline-offset: 2px; }

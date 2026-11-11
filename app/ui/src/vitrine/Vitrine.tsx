@@ -10,6 +10,7 @@ import {
   CHAMPIONS_CALISTE, ECART_OR, EFFECTIF_SECOURS, EVENEMENTS_OR, EXTRAS, FORME_CALISTE, G2, KC, MOMENTS, RADAR_CALISTE,
 } from './exemple';
 import './vitrine.css';
+import { Ecrans, ECRANS, useEcran } from './ecrans';
 
 function Section({ id, title, milestone, children }: { id: string; title: string; milestone: string; children: React.ReactNode }) {
   return (
@@ -42,7 +43,7 @@ function useKarmine(): { players: SquadPlayer[]; staff: StaffMember[]; fromBase:
   return data;
 }
 
-export function Vitrine() {
+function Composants() {
   const { players: EFFECTIF, staff, fromBase } = useKarmine();
   const caliste = EFFECTIF.find((j) => j.pseudo === 'Caliste') ?? EFFECTIF[0];
   const photoOf = (pseudo: string) => EFFECTIF.find((j) => j.pseudo === pseudo)?.photo;
@@ -203,5 +204,21 @@ export function Vitrine() {
         </div>
       </Section>
     </main>
+  );
+}
+
+/** Vitrine : les composants, puis chaque écran de la maquette v2 (lien #accueil, #effectif…). */
+export function Vitrine() {
+  const ecran = useEcran();
+  return (
+    <>
+      <nav className="vt-tabs" aria-label="Pages de la vitrine">
+        <a href="#composants" aria-current={ecran === null ? 'page' : undefined}>Composants</a>
+        {ECRANS.map((e) => (
+          <a key={e.id} href={`#${e.id}`} aria-current={ecran === e.id ? 'page' : undefined}>{e.label}</a>
+        ))}
+      </nav>
+      {ecran === null ? <Composants /> : <Ecrans id={ecran} />}
+    </>
   );
 }
