@@ -140,7 +140,7 @@ export async function listTeams(leagueId: string): Promise<Team[]> {
 
 /**
  * Une partie simulée par le moteur (M3 : 15 min de farm, sans combat).
- * Dans l'app : simulée à la demande. Dans le navigateur : la partie KC–G2 graine 1,
+ * Dans l'app : simulée à la demande. Dans le navigateur : la partie KC–G2 graine 3,
  * produite par le même moteur (`just sim KC G2 --n 1 --replay data/seed/public/match-demo.json`).
  */
 export async function simulateMatch(blue: string, red: string, matchSeed: number): Promise<MatchReplay> {

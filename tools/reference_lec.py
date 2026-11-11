@@ -11,7 +11,10 @@ import sys
 from collections import defaultdict
 
 ROLES = {"top": "top", "jng": "jungle", "mid": "mid", "bot": "bot", "sup": "support"}
-PER_ROLE = ["csat10", "goldat10", "xpat10", "csat15", "goldat15", "xpat15"]
+PER_ROLE = [
+    "csat10", "goldat10", "xpat10", "csat15", "goldat15", "xpat15",
+    "killsat10", "deathsat10", "killsat15", "deathsat15",
+]
 
 
 def summary(values):
@@ -40,6 +43,9 @@ def main(folder, year):
         "roles": {role: {k: summary(v) for k, v in ks.items()} for role, ks in per_role.items()},
         "duration_min": summary([float(g[0]["gamelength"]) / 60 for g in pairs]),
         "kills": both("kills"),
+        "kills_at10": both("killsat10"),
+        "kills_at15": both("killsat15"),
+        "damage_per_min": summary([float(r["dpm"]) for g in pairs for r in g]),
         "dragons": both("dragons"),
         "barons": both("barons"),
         "towers": both("towers"),

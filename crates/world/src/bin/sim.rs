@@ -98,10 +98,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let same = simulate(&setup(a.seed)).players == simulate(&setup(a.seed)).players;
 
     let mut out = String::new();
-    writeln!(out, "# Rapport de farm (M3)\n")?;
+    writeln!(out, "# Rapport de calibrage : farm et combat (M4b)\n")?;
     writeln!(
         out,
-        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Sans combat entre champions (M4).",
+        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b) ; ni objets (M4c) ni plan d'équipe ni ganks (M5).",
         a.n,
         a.minutes,
         teams[0].tag,
@@ -140,12 +140,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &'a Vec<Vec<Snapshot>>,
         fn(&Snapshot) -> f64,
     );
-    let metrics: [Metric; 5] = [
+    let metrics: [Metric; 9] = [
         ("CS à 10 min", "csat10", &at10, |s| f64::from(s.cs)),
         ("Or à 10 min", "goldat10", &at10, |s| s.gold),
         ("XP à 10 min", "xpat10", &at10, |s| s.xp),
         ("CS à 15 min", "csat15", &at15, |s| f64::from(s.cs)),
         ("Or à 15 min", "goldat15", &at15, |s| s.gold),
+        ("Kills à 10 min", "killsat10", &at10, |s| {
+            f64::from(s.kills)
+        }),
+        ("Morts à 10 min", "deathsat10", &at10, |s| {
+            f64::from(s.deaths)
+        }),
+        ("Kills à 15 min", "killsat15", &at15, |s| {
+            f64::from(s.kills)
+        }),
+        ("Morts à 15 min", "deathsat15", &at15, |s| {
+            f64::from(s.deaths)
+        }),
     ];
     for (title, key, data, get) in metrics {
         writeln!(out, "## {title}\n")?;
@@ -170,6 +182,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         writeln!(out)?;
     }
+    writeln!(out, "## Kills des deux équipes\n")?;
+    writeln!(out, "| Moment | Simulé | LEC 2025 |\n|---|---|---|")?;
+    for (label, key, data) in [
+        ("10 min", "kills_at10", &at10),
+        ("15 min", "kills_at15", &at15),
+    ] {
+        // Somme des kills des 10 joueurs de chaque partie (les joueurs sont rangés par partie).
+        let games = data[0].len() / 2;
+        let per_game: Vec<f64> = (0..games)
+            .map(|g| {
+                (0..5)
+                    .map(|r| f64::from(data[r][2 * g].kills + data[r][2 * g + 1].kills))
+                    .sum()
+            })
+            .collect();
+        let (m, sd) = mean_sd(&per_game);
+        let real = &reference[key];
+        writeln!(
+            out,
+            "| {label} | {m:.1} ± {sd:.1} | {:.1} ± {:.1} |",
+            real[0].as_f64().unwrap_or(0.0),
+            real[1].as_f64().unwrap_or(0.0)
+        )?;
+    }
+    writeln!(out)?;
     writeln!(out, "## Autres mesures\n")?;
     let n = (a.n * 2).max(1) as f64;
     for r in 0..5 {

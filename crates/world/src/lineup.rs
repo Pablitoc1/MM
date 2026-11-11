@@ -69,6 +69,15 @@ pub fn champion_stats(db: &Db, id: &str) -> Result<Option<ChampionStats>, Lineup
         attack_range: f("attackrange")?,
         move_speed: f("movespeed")?,
         mp: f("mp")?,
+        mp_per_level: f("mpperlevel")?,
+        armor: f("armor")?,
+        armor_per_level: f("armorperlevel")?,
+        magic_resist: f("spellblock")?,
+        magic_resist_per_level: f("spellblockperlevel")?,
+        hp_regen: f("hpregen")?,
+        hp_regen_per_level: f("hpregenperlevel")?,
+        mp_regen: f("mpregen")?,
+        mp_regen_per_level: f("mpregenperlevel")?,
     }))
 }
 
@@ -145,12 +154,14 @@ pub fn lineup(db: &Db, team: &Team, taken: &mut Vec<String>) -> Result<TeamSetup
         }
         let champion = champion.ok_or_else(|| LineupError::BadChampion(FALLBACK[i].into()))?;
         taken.push(champion.id.clone());
+        let kit = kit(db, &champion.id)?;
         players.push(PlayerSetup {
             name: p.handle.clone(),
             role: *role,
             champion,
             attrs: attributes(db, &p.person_id)?,
             spells: spells(*role),
+            kit,
         });
     }
     Ok(TeamSetup {
