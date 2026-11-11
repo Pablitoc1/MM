@@ -38,9 +38,11 @@ accueil en M10) réutiliseront ces briques au lieu de les refaire.
 ## Écrans complets de la maquette (retour de Yahia : « ça ne ressemble toujours pas »)
 - **Constat** : un catalogue de briques ne suffit pas à retrouver la maquette ; il manquait
   la mise en page de chaque écran et beaucoup de petits blocs.
-- **Choix** : la vitrine reproduit maintenant sept écrans de la maquette v2 à l'identique
+- **Choix** : la vitrine reproduit sept écrans de la maquette v2 à l'identique
   (Accueil, Effectif, Fiche joueur, Entraînement, Draft, Pause, Après-match), un onglet par
   écran (`vitrine.html#accueil`…). Le match en direct reste au fil du moteur 2D.
+- **Découpage** (règle des ~1 500 lignes) : cette PR apporte le cadre (`Shell`, variables,
+  onglets) ; les écrans arrivent dans des PR enchaînées, un ou deux écrans chacune.
 - **Méthode** : chaque écran est converti depuis le rendu de la maquette en JSX, puis
   comparé capture contre capture (`docs/demo/composants/ecrans/`). Toutes les couleurs
   passent par `tokens.css` (neuf variables ajoutées), les photos et logos sont ceux de M1.
