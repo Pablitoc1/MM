@@ -62,7 +62,13 @@ fn player(seed: State<Seed>, person_id: String) -> Result<Option<PlayerDetail>, 
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Mise à jour automatique : l'interface cherche une nouvelle version au lancement.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+    builder
         .setup(|app| {
             let path = app.path().resource_dir()?.join("world.sqlite");
             let db = Db::open_read_only(&path)

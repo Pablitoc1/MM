@@ -1,0 +1,75 @@
+# Nouvelle version du jeu à chaque fusion dans main.
+# Fabrique les installateurs Windows et Mac (et Linux), les signe pour la mise à jour
+# automatique, et les publie dans une « release » GitHub avec le fichier latest.json
+# que le jeu installé lit au lancement.
+name: Nouvelle version
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: version
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    name: Version ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            args: ''
+          - name: Mac
+            os: macos-latest
+            # Une seule app pour les Mac Intel et Apple (M1, M2…).
+            args: '--target universal-apple-darwin'
+          - name: Linux
+            os: ubuntu-24.04
+            args: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'Mac' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Dépendances système de Tauri (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Numéro de version (0.1.<numéro de la fusion>)
+        shell: bash
+        run: |
+          node -e "require('fs').writeFileSync('app/src-tauri/tauri.version.json', JSON.stringify({
+            version: '0.1.${{ github.run_number }}',
+            bundle: { createUpdaterArtifacts: true }
+          }))"
+      - run: cd app && npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          projectPath: app
+          args: --config src-tauri/tauri.version.json ${{ matrix.args }}
+          tagName: v0.1.${{ github.run_number }}
+          releaseName: Esport Manager 0.1.${{ github.run_number }}
+          releaseBody: Version fabriquée depuis main. Le jeu installé la propose tout seul au lancement.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true

@@ -33,9 +33,11 @@ jobs:
         run: cd app && npm ci && npm run build
       - run: just check
 
+  # Installateurs de test d'une PR. Sur main, c'est « Nouvelle version » qui les fabrique.
   bundle:
     name: Installateur ${{ matrix.name }}
     needs: check
+    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:

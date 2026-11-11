@@ -4,7 +4,7 @@
 use rusqlite::Connection;
 
 /// Version du schéma de la base. Augmente à chaque migration.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 const V1: &str = r#"
 CREATE TABLE meta (
@@ -139,9 +139,77 @@ CREATE TABLE summoner_spells (
 );
 "#;
 
+/// Données de la draft (Oracle's Elixir), voir docs/decisions/008.
+pub const DRAFT: &str = r#"
+-- Méta de chaque patch (« 26.2 ») dans les ligues majeures et les internationaux.
+-- games = parties du patch ; tier = lettre de la grille de draft (A à D).
+CREATE TABLE champion_meta (
+    patch    TEXT NOT NULL,
+    champion TEXT NOT NULL,           -- clé Data Dragon
+    games    INTEGER NOT NULL,
+    picks    INTEGER NOT NULL,
+    bans     INTEGER NOT NULL,
+    wins     INTEGER NOT NULL,
+    tier     TEXT NOT NULL,
+    PRIMARY KEY (patch, champion)
+);
+
+-- Rôles joués par chaque champion sur le patch (top, jng, mid, bot, sup).
+CREATE TABLE champion_meta_roles (
+    patch    TEXT NOT NULL,
+    champion TEXT NOT NULL,
+    role     TEXT NOT NULL,
+    picks    INTEGER NOT NULL,
+    wins     INTEGER NOT NULL,
+    PRIMARY KEY (patch, champion, role)
+);
+
+-- Champions joués en compétition par chaque joueur de la base, 2014-2025.
+-- mastery = parties pondérées par leur ancienneté (une année = moitié moins).
+CREATE TABLE player_pool (
+    person_id   TEXT NOT NULL,
+    champion    TEXT NOT NULL,
+    games       INTEGER NOT NULL,
+    wins        INTEGER NOT NULL,
+    mastery     REAL NOT NULL,
+    last_played TEXT NOT NULL,
+    PRIMARY KEY (person_id, champion)
+);
+
+-- Profil des champions dans les ligues majeures 2024-2025 : victoires selon la durée
+-- de la partie (courte < 29 min, longue >= 36 min) et écart d'or moyen à 10 et 15 min.
+CREATE TABLE champion_profile (
+    champion     TEXT PRIMARY KEY,
+    games_short  INTEGER NOT NULL,
+    wins_short   INTEGER NOT NULL,
+    games_mid    INTEGER NOT NULL,
+    wins_mid     INTEGER NOT NULL,
+    games_long   INTEGER NOT NULL,
+    wins_long    INTEGER NOT NULL,
+    gold_diff_10 REAL,
+    gold_diff_15 REAL
+);
+
+-- Vraies drafts des ligues majeures 2025-2026, dans l'ordre officiel.
+-- actions = JSON [["B","ban","Ahri"], ["B","pick","Azir","mid"], …].
+CREATE TABLE pro_drafts (
+    game_id   TEXT PRIMARY KEY,
+    date      TEXT NOT NULL,
+    league    TEXT NOT NULL,
+    patch     TEXT NOT NULL,
+    game_no   INTEGER NOT NULL,
+    blue_team TEXT NOT NULL,
+    red_team  TEXT NOT NULL,
+    blue_win  INTEGER NOT NULL,
+    actions   TEXT NOT NULL
+);
+CREATE INDEX pro_drafts_teams ON pro_drafts (blue_team, red_team);
+"#;
+
 /// Crée toutes les tables dans une base vide.
 pub fn create(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(V1)?;
+    conn.execute_batch(DRAFT)?;
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
 }

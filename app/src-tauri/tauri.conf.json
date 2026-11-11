@@ -25,6 +25,14 @@
     "active": true,
     "targets": "all",
     "resources": { "../../data/seed/world.sqlite": "world.sqlite" },
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEMDhGQkM2QjQwMzZENzEKUldSeGJRTzB4dnNJTGZWK21mUmNqa1p6dkV2QjRCakJuamJoRjg5c1VLUWJ3dU1JS3VJcHpiUWMK",
+      "endpoints": ["https://github.com/Pablitoc1/MM/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
   }
 }
