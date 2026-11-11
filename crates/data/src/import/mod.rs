@@ -5,11 +5,13 @@
 //!   joueurs, contrats, stats pro 2025 ;
 //! - Liquipedia (liquipedia.net, API MediaWiki) : photos des joueurs et logos des clubs ;
 //! - Oracle's Elixir (Google Drive) : parties pro 2024 et 2025, pour les notes ;
-//! - Data Dragon (Riot) : champions, objets, sorts d'invocateur du patch de départ.
+//! - Data Dragon (Riot) : champions, objets, sorts d'invocateur du patch de départ ;
+//! - CommunityDragon et Meraki Analytics : chiffres des sorts des champions (note 011).
 //!
 //! Les réponses brutes sont gardées dans `data/raw/` : relancer l'import
 //! ne refait pas les requêtes (supprime le dossier pour tout retélécharger).
 
+pub mod cdragon;
 pub mod ddragon;
 pub mod draft;
 pub mod http;
@@ -79,6 +81,9 @@ pub fn run(opts: &Options) -> Result<()> {
     eprintln!("Data Dragon {DDRAGON_VERSION}…");
     let champs = ddragon::import(&fetch, &tx, DDRAGON_VERSION, &images_dir)?;
 
+    eprintln!("CommunityDragon {} (sorts)…", cdragon::CDRAGON_VERSION);
+    let kits = cdragon::import(&fetch, &tx, &champion_ids(&tx)?)?;
+
     eprintln!("Leaguepedia…");
     let summary = leaguepedia::import(&fetch, &tx, &leagues, &champs)?;
 
@@ -98,13 +103,15 @@ pub fn run(opts: &Options) -> Result<()> {
     for (k, v) in [
         ("schema_version", schema::SCHEMA_VERSION.to_string()),
         ("ddragon_version", DDRAGON_VERSION.to_string()),
+        ("cdragon_version", cdragon::CDRAGON_VERSION.to_string()),
         ("roster_date", "2026-01-05".to_string()),
         ("stats_season", "2025".to_string()),
         (
             "sources",
             "Leaguepedia (lol.fandom.com, CC BY-SA 3.0) ; photos et logos : Liquipedia \
              (liquipedia.net, CC BY-SA 3.0) ; parties pro : Oracle's Elixir (oracleselixir.com) ; \
-             Data Dragon (Riot Games)"
+             Data Dragon (Riot Games) ; \
+             sorts : CommunityDragon (communitydragon.org), Meraki Analytics"
                 .to_string(),
         ),
     ] {
@@ -122,6 +129,7 @@ pub fn run(opts: &Options) -> Result<()> {
     write_preview(&opts.out, &preview)?;
 
     eprintln!("{summary}, {images}");
+    eprintln!("{kits}");
     eprintln!("{notes}");
     eprintln!("{draft}");
     eprintln!("Base écrite : {}", opts.out.display());
@@ -154,6 +162,38 @@ pub fn run_draft_only(opts: &Options) -> Result<()> {
     conn.execute_batch("VACUUM")?;
     eprintln!("{draft}");
     Ok(())
+}
+
+/// Refait seulement les sorts des champions dans une base existante : `just seed-kits`.
+pub fn run_kits_only(opts: &Options) -> Result<()> {
+    let fetch = Fetcher::new(opts.root.join("data/raw"));
+    let mut conn = Connection::open(&opts.out)?;
+    let tx = conn.transaction()?;
+    tx.execute_batch("DROP TABLE IF EXISTS champion_kits")?;
+    tx.execute_batch(schema::KITS)?;
+    let kits = cdragon::import(&fetch, &tx, &champion_ids(&tx)?)?;
+    tx.pragma_update(None, "user_version", schema::SCHEMA_VERSION)?;
+    for (k, v) in [
+        ("schema_version", schema::SCHEMA_VERSION.to_string()),
+        ("cdragon_version", cdragon::CDRAGON_VERSION.to_string()),
+    ] {
+        tx.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)",
+            params![k, v],
+        )?;
+    }
+    tx.commit()?;
+    conn.execute_batch("VACUUM")?;
+    eprintln!("{kits}");
+    Ok(())
+}
+
+fn champion_ids(conn: &Connection) -> Result<Vec<String>> {
+    let mut st = conn.prepare("SELECT id FROM champions ORDER BY id")?;
+    let ids = st
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
 }
 
 /// Extrait de la base pour l'interface hors Tauri (`just dev-web`, démos) :

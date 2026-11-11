@@ -380,6 +380,24 @@ impl Db {
             .optional()
     }
 
+    /// Clés Data Dragon de tous les champions.
+    pub fn champion_ids(&self) -> rusqlite::Result<Vec<String>> {
+        let mut st = self.conn.prepare("SELECT id FROM champions ORDER BY id")?;
+        let ids = st.query_map([], |r| r.get(0))?.collect();
+        ids
+    }
+
+    /// Sorts d'un champion (JSON `mm_engine::kit::Kit`), si la base les a.
+    pub fn champion_kit(&self, id: &str) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT data FROM champion_kits WHERE champion = ?1",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()
+    }
+
     pub fn top_champions(&self, person_id: &str, n: u32) -> rusqlite::Result<Vec<String>> {
         let mut st = self.conn.prepare(
             "SELECT champion FROM player_champions_2025

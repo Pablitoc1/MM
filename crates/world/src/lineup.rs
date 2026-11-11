@@ -72,6 +72,16 @@ pub fn champion_stats(db: &Db, id: &str) -> Result<Option<ChampionStats>, Lineup
     }))
 }
 
+/// Les sorts d'un champion (note 011), lus dans la base.
+pub fn kit(db: &Db, id: &str) -> Result<Option<mm_engine::Kit>, LineupError> {
+    let Some(json) = db.champion_kit(id)? else {
+        return Ok(None);
+    };
+    serde_json::from_str(&json)
+        .map(Some)
+        .map_err(|_| LineupError::BadChampion(id.into()))
+}
+
 /// Clés des attributs dans la base (table `player_attributes`), dans l'ordre de `mm_engine::Attr`.
 const ATTR_KEYS: [&str; 15] = [
     "mecanique",
