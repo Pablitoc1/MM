@@ -22,3 +22,15 @@ accueil en M10) réutiliseront ces briques au lieu de les refaire.
   pour que l'écran reste lisible.
 - **Drapeaux** dessinés en SVG pour les pays courants de la LEC ; un pays absent
   s'affiche avec son code. Leurs couleurs sont celles des drapeaux, pas du thème.
+
+## Mise à jour après M1
+- **Branchés sur la base** : la vitrine lit l'effectif et le staff réels de Karmine Corp
+  (`api.ts`, donc `apercu.json` hors de Tauri), avec photos, logos et icônes de champions
+  locaux. `components/ui/adapt.ts` fait le passage base → composants ; les valeurs que la
+  base n'a pas encore (niveau M2, moral et fatigue M10, valeur M11) arrivent à part et
+  sont marquées comme exemples.
+- **Une seule icône de poste** : `components/RoleIcon.tsx` (écran Effectif de M1) dessine
+  désormais avec le composant partagé, sans changer son apparence.
+- **Courbe d'or** : les événements portent leur icône comme dans la maquette (champion du
+  tueur, dragon, larves, Nashor, tour), cerclée à la couleur de l'équipe, avec la légende.
+  Les trois icônes d'objectifs sont celles des maquettes v2 (`components/ui/assets/`).

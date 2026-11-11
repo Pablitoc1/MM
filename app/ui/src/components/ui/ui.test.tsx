@@ -5,7 +5,9 @@ import {
   ProbabilityBar, RadarChart, RoleIcon, SquadTable, StateGauge, Stars, StatusTag, chemistryLabel, formatEcart,
   formatEuros, masteryLabel, niceStep, summarizeGold, toneOf100, toneOf20, toneOfFatigue,
 } from '.';
-import { EFFECTIF } from '../../vitrine/exemple';
+import { EFFECTIF_SECOURS as EFFECTIF } from '../../vitrine/exemple';
+import { toSquadPlayer, toStaff } from './adapt';
+import type { RosterMember } from '../../api';
 
 // toLocaleString('fr-FR') sépare les milliers par une espace fine insécable.
 const norm = (s: string | null) => (s ?? '').replace(/[\u202f\u00a0]/g, ' ');
@@ -98,7 +100,7 @@ describe('blocs', () => {
     expect(screen.getAllByRole('row')).toHaveLength(EFFECTIF.length + 1);
     expect(screen.getAllByText('Fin de contrat cette année')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Caliste' }));
-    expect(onOpen).toHaveBeenCalledWith('caliste');
+    expect(onOpen).toHaveBeenCalledWith('Caliste');
   });
 
   it('affiche l\'en-tête de la fiche joueur', () => {
@@ -153,5 +155,64 @@ describe('graphiques', () => {
       axes={[{ label: 'Laning', value: 16, reference: 14 }, { label: 'Farm', value: 17, reference: 13 }, { label: 'Vision', value: 11 }]} />);
     expect(screen.getByRole('img', { name: /Profil de Caliste comparé à : Moyenne ADC LEC/ })).toBeInTheDocument();
     expect(container.querySelectorAll('polygon[stroke-dasharray]')).toHaveLength(1);
+  });
+});
+
+describe('événements de la courbe d\'or', () => {
+  it('pose un marqueur par événement et légende les types présents', () => {
+    const { container } = render(<GoldDiffChart values={[0, -200, 300, 900]} us="KC" them="G2" events={[
+      { minute: 1, side: 'them', kind: 'dragon', label: 'Dragon pour G2' },
+      { minute: 2, side: 'us', kind: 'tour', label: 'Tour pour KC' },
+      { minute: 3, side: 'us', kind: 'kill', champion: { name: 'Varus', icon: '/champions/Varus.png' }, label: 'Kill' },
+    ]} />);
+    const marks = container.querySelectorAll('.ui-gold-mark');
+    expect(marks).toHaveLength(3);
+    expect(marks[0]).toHaveAttribute('title', 'Dragon pour G2');
+    expect(container.querySelector('svg text[font-weight="700"]')).toHaveTextContent('+900'); // pastille de fin
+    for (const t of ['Dragon', 'Tour', 'Kill (tueur)']) expect(screen.getByText(t)).toBeInTheDocument();
+    expect(screen.queryByText('Nashor')).not.toBeInTheDocument();
+  });
+});
+
+describe('courbe d\'or : options du match en direct', () => {
+  it('regroupe les icônes d\'un combat avec leur badge et peut masquer la légende', () => {
+    const { container } = render(<GoldDiffChart values={[0, 500, 2400]} us="KC" them="G2" legend={false} events={[
+      { minute: 1, side: 'us', kind: 'kill', icons: ['/a.png', '/b.png', '/c.png'], badge: '⚔ 3 – 1', label: 'Combat' },
+      { minute: 2, side: 'us', kind: 'kill', icon: '/v.png', badge: '×2', highlight: true, label: 'Double kill' },
+    ]} />);
+    expect(container.querySelectorAll('.ui-gold-mark img')).toHaveLength(4);
+    expect(screen.getByText('⚔ 3 – 1')).toHaveClass('ui-gold-mark__badge--top');
+    expect(screen.getByText('×2')).toHaveClass('ui-gold-mark__badge--corner');
+    expect(screen.queryByText('Kill (tueur)')).not.toBeInTheDocument();
+    expect(norm(screen.getByText(/2,4k/).textContent)).toBe('+2,4k');
+  });
+
+  it('écrit le libellé de la probabilité à droite si demandé', () => {
+    render(<ProbabilityBar us={64} showLabel />);
+    expect(screen.getByText('Probabilité de victoire')).toBeInTheDocument();
+  });
+});
+
+describe('données de la base', () => {
+  const base: RosterMember = {
+    personId: 'Caliste', handle: 'Caliste', realName: 'Caliste Henry-Hennebert', country: 'France',
+    birthdate: '2006-08-28', role: 'Bot', isStaff: false, photoFile: 'photos/caliste.jpeg',
+    contractEnd: '2026-11-20', stats2025: null, topChampions: ['Ezreal', 'Varus'],
+  };
+  const extras = { level: 4, potential: 5, form: [], morale: 80, fatigue: 20, value: 1, statuts: [] };
+
+  it('convertit un joueur de la base en ligne d\'effectif', () => {
+    const p = toSquadPlayer(base, extras);
+    expect(p).toMatchObject({
+      pseudo: 'Caliste', role: 'adc', country: 'FR', age: 19, contractEnd: 'nov. 2026', contractEndsThisYear: true,
+    });
+    expect(p?.photo).toMatch(/photos\/caliste\.jpeg$/);
+    expect(p?.champions.map((c) => c.name)).toEqual(['Ezreal', 'Varus']);
+  });
+
+  it('écarte le staff de l\'effectif et le garde pour la liste du staff', () => {
+    const coach = { ...base, handle: 'Reapered', role: 'Coach', isStaff: true };
+    expect(toSquadPlayer(coach, extras)).toBeNull();
+    expect(toStaff(coach)).toMatchObject({ name: 'Reapered', role: 'Coach' });
   });
 });

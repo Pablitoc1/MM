@@ -18,7 +18,8 @@ export {
   masteryLabel, chemistryLabel,
 } from './Blocks';
 export { PlayerHeader, SquadTable } from './Player';
+export { toSquadPlayer, toStaff, type SquadExtras } from './adapt';
 export {
-  GoldDiffChart, FormChart, RadarChart, KeyMoments, summarizeGold, niceStep,
-  type GoldEvent, type FormPoint, type RadarAxis, type KeyMoment,
+  GoldDiffChart, FormChart, RadarChart, KeyMoments, summarizeGold, niceStep, GOLD_EVENT_LABEL, OBJECTIVE_ICON, TowerIcon, GoldLegend, formatK,
+  type GoldEvent, type GoldEventKind, type FormPoint, type RadarAxis, type KeyMoment,
 } from './Charts';
