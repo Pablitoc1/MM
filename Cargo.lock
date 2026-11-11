@@ -2003,6 +2003,7 @@ dependencies = [
  "mm-data",
  "mm-world",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-process",
