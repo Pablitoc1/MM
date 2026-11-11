@@ -1,4 +1,4 @@
-# 004 · Base de départ livrée avec le jeu
+# 006 · Base de départ livrée avec le jeu
 
 Date : 11 novembre 2026.
 

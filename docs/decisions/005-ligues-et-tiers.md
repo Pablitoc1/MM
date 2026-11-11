@@ -1,4 +1,4 @@
-# 003 · Ligues importées et tiers
+# 005 · Ligues importées et tiers
 
 Date : 11 novembre 2026.
 

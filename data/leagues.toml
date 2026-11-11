@@ -3,7 +3,7 @@
 # L'import choisit lui-même le tournoi de référence : le premier tournoi régulier
 # qui commence après le 15 décembre 2025, sinon le dernier de 2025.
 # Liste établie à la main (Leaguepedia ne classe pas les ligues en tiers) :
-# voir docs/decisions/003-ligues-et-tiers.md. Modifiable librement.
+# voir docs/decisions/005-ligues-et-tiers.md. Modifiable librement.
 # Absentes car disparues en 2026 : LVP SuperLiga (remplacée par la LES),
 # LFL Division 2 (fondue dans la LFL), Liga Valkyria (format de qualifications).
 

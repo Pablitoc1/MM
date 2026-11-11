@@ -43,7 +43,7 @@ fn base_de_depart_complete() {
 
     // LEC : au moins les 10 clubs, chacun avec ses 5 postes.
     // Les images présentes doivent exister sur le disque (le serveur d'images du wiki
-    // refuse pour l'instant l'import : voir docs/decisions/004-base-de-depart.md).
+    // refuse pour l'instant l'import : voir docs/decisions/006-base-de-depart.md).
     let public = path.parent().unwrap().join("public");
     let lec = db.teams("LEC").unwrap();
     assert!(lec.len() >= 10, "LEC : {} clubs", lec.len());
