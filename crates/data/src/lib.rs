@@ -5,6 +5,7 @@
 
 pub mod ratings;
 pub mod read;
+pub mod read_draft;
 pub mod schema;
 
 #[cfg(feature = "import")]
@@ -14,6 +15,7 @@ pub use read::{
     AttrScore, ChampionUse, Db, League, PlayerDetail, Rating, RosterMember, SeasonStats, Team,
     TournamentStats,
 };
+pub use read_draft::{ChampionKind, MetaChampion, PoolEntry, ProDraft, Profile};
 pub use schema::SCHEMA_VERSION;
 // Pour que l'application manipule les erreurs sans dépendre directement de rusqlite.
 pub use rusqlite;
