@@ -12,11 +12,18 @@ if (!milestone) {
   process.exit(1);
 }
 
-// Chaque jalon déclare ses captures : nom du fichier + clics à faire avant.
+// Chaque jalon déclare ses captures : nom du fichier + actions à faire avant.
+// Action : { click: 'bouton' }, { tab: 'onglet' } ou { select: ['libellé', 'valeur'] }.
 const SHOTS = {
   M0: [
-    { name: 'accueil', clicks: [] },
-    { name: 'effectif', clicks: ['Effectif'] },
+    { name: 'accueil', steps: [] },
+    { name: 'effectif', steps: [{ click: 'Effectif' }] },
+  ],
+  M1: [
+    { name: 'effectif-karmine-corp', steps: [{ click: 'Effectif' }] },
+    { name: 'effectif-g2-esports', steps: [{ click: 'Effectif' }, { select: ['Club', 'G2 Esports'] }] },
+    { name: 'effectif-fnatic', steps: [{ click: 'Effectif' }, { select: ['Club', 'Fnatic'] }] },
+    { name: 'staff-karmine-corp', steps: [{ click: 'Effectif' }, { tab: 'Staff' }] },
   ],
 };
 
@@ -36,7 +43,7 @@ try {
 }
 
 const root = resolve('app/dist');
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const path = req.url === '/' ? '/index.html' : decodeURIComponent(req.url.split('?')[0]);
   try {
@@ -57,8 +64,15 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, dev
 for (const shot of shots) {
   await page.goto(url);
   await page.waitForLoadState('networkidle');
-  for (const label of shot.clicks) await page.getByRole('button', { name: label }).click();
+  for (const step of shot.steps) {
+    if (step.click) await page.getByRole('button', { name: step.click }).click();
+    if (step.tab) await page.getByRole('tab', { name: new RegExp(step.tab) }).click();
+    if (step.select) await page.getByLabel(step.select[0]).selectOption(step.select[1]);
+    await page.waitForLoadState('networkidle');
+  }
   await page.evaluate(() => document.fonts.ready);
+  // Attend que toutes les images (photos, logos, champions) soient chargées.
+  await page.waitForFunction(() => [...document.images].every((i) => i.complete));
   const file = join(out, `${shot.name}.png`);
   await page.screenshot({ path: file });
   console.log(`Capture : ${file}`);

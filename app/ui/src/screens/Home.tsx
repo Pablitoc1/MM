@@ -10,9 +10,9 @@ const COLORS: [string, string][] = [
 ];
 
 const NEXT: [string, string][] = [
-  ['M0', 'Socle du projet'],
   ['M1', 'Base de données et import réel'],
   ['M2', 'Notes des joueurs'],
+  ['M3', 'Carte et déplacements'],
 ];
 
 export function Home({ world }: { world: WorldInfo }) {
@@ -20,7 +20,7 @@ export function Home({ world }: { world: WorldInfo }) {
     <>
       <h1 className="h1">Accueil</h1>
       <p className="muted" style={{ margin: 0 }}>
-        Le socle de l'application est en place. Les vrais écrans arrivent jalon par jalon.
+        La base de données réelle est en place : l'écran Effectif montre les vrais clubs de la LEC. Les autres écrans arrivent jalon par jalon.
       </p>
       <div className="grid">
         <section className="card">
