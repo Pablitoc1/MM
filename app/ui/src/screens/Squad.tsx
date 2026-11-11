@@ -78,7 +78,7 @@ export function Squad({ teamId: shownTeam, onTeamChange, onOpenPlayer }: Props) 
         {tab === 'joueurs' ? <PlayersTable players={players} onOpen={onOpenPlayer} /> : <StaffTable staff={staff} />}
       </section>
       <p className="note">
-        Effectif de départ et contrats : Leaguepedia. Stats : matchs pro 2025 (tous tournois). Niveau sur 100, calculé sur les parties 2024-2025 (Oracle's Elixir) : une fourchette signale une note incertaine. Clique sur un joueur pour sa fiche.
+        Effectif de départ et contrats : Leaguepedia. Stats : matchs pro 2025 (tous tournois). Niveau sur 100, calculé sur les parties pro 2014-2025 (Oracle's Elixir) et le niveau de chaque ligue : une fourchette signale une note incertaine. Clique sur un joueur pour sa fiche.
       </p>
     </>
   );

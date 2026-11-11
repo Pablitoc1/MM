@@ -112,11 +112,11 @@ function RatingNote({ p }: { p: PlayerDetail }) {
   const r = p.member.rating;
   if (!r) return null;
   if (r.source !== 'stats') {
-    return <p className="note">Aucune partie pro de ce joueur dans nos données 2024-2025 : ses notes sont estimées au niveau de sa ligue.</p>;
+    return <p className="note">Aucune partie pro de ce joueur dans nos données (2014-2025) : ses notes sont estimées au niveau de sa ligue.</p>;
   }
   return (
     <p className="note">
-      Notes calculées sur {r.games} parties pro (2024-2025, 2025 compte double), comparées aux autres joueurs du même poste et ajustées au niveau de la ligue.
+      Notes calculées sur {r.games} parties pro de 2014 à 2025 (les plus récentes comptent le plus), comparées aux joueurs du même poste dans la même ligue, puis ajustées au niveau de chaque ligue.
       Une fourchette signale une note incertaine ; « estimé » une qualité que les stats ne mesurent pas.
     </p>
   );
