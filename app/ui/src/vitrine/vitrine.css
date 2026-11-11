@@ -12,3 +12,8 @@ body { overflow: auto; }
 .vt-col { display: flex; flex-direction: column; gap: 6px; }
 .vt-grid--wide { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
 @media (max-width: 900px) { .vt-grid--wide { grid-template-columns: 1fr; } }
+
+/* Onglets de la vitrine : composants puis écrans de la maquette. */
+.vt-tabs { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 16px; background: var(--bg-page); border-bottom: 1px solid var(--border); }
+.vt-tabs a { padding: 6px 12px; border-radius: 6px; color: var(--text-muted); text-decoration: none; font-size: 13px; }
+.vt-tabs a[aria-current='page'] { background: var(--bg-active); color: var(--text); font-weight: 600; }

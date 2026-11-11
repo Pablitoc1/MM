@@ -34,3 +34,18 @@ accueil en M10) réutiliseront ces briques au lieu de les refaire.
 - **Courbe d'or** : les événements portent leur icône comme dans la maquette (champion du
   tueur, dragon, larves, Nashor, tour), cerclée à la couleur de l'équipe, avec la légende.
   Les trois icônes d'objectifs sont celles des maquettes v2 (`components/ui/assets/`).
+
+## Écrans complets de la maquette (retour de Yahia : « ça ne ressemble toujours pas »)
+- **Constat** : un catalogue de briques ne suffit pas à retrouver la maquette ; il manquait
+  la mise en page de chaque écran et beaucoup de petits blocs.
+- **Choix** : la vitrine reproduit maintenant sept écrans de la maquette v2 à l'identique
+  (Accueil, Effectif, Fiche joueur, Entraînement, Draft, Pause, Après-match), un onglet par
+  écran (`vitrine.html#accueil`…). Le match en direct reste au fil du moteur 2D.
+- **Méthode** : chaque écran est converti depuis le rendu de la maquette en JSX, puis
+  comparé capture contre capture (`docs/demo/composants/ecrans/`). Toutes les couleurs
+  passent par `tokens.css` (neuf variables ajoutées), les photos et logos sont ceux de M1.
+- **Barre du haut et menu** : composant réutilisable `Shell` (club, classement, date,
+  prochain match, budget, Continuer, menu avec pastilles).
+- **Pour les jalons** : ces écrans sont les modèles à suivre. Chaque jalon remplace les
+  chiffres d'exemple de son écran par les vraies données et découpe en composants ce dont
+  il a besoin ; il ne redessine pas l'écran.
