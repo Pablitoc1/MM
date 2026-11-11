@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import { Vitrine } from './Vitrine';
+import { Ecrans, ECRANS } from './ecrans';
 import { Shell } from '../components/ui';
 
 describe('Vitrine', () => {
@@ -10,6 +11,24 @@ describe('Vitrine', () => {
       expect(screen.getByRole('heading', { level: 2, name: titre })).toBeInTheDocument();
     }
     expect(screen.getAllByRole('row')).toHaveLength(6);
+  });
+});
+
+describe('Écrans de la maquette', () => {
+  afterEach(() => { window.location.hash = ''; });
+
+  it.each(ECRANS.map((e) => [e.id]))('affiche l\'écran %s', (id) => {
+    const { container } = render(<Ecrans id={id} />);
+    expect(container.querySelector('.m-screen')).not.toBeNull();
+    expect(container.querySelectorAll('img').length).toBeGreaterThan(3);
+  });
+
+  it('ouvre un écran depuis le lien de la vitrine', () => {
+    window.location.hash = '#accueil';
+    render(<Vitrine />);
+    const menu = screen.getByRole('navigation', { name: 'Menu principal' });
+    expect(within(menu).getByRole('link', { current: 'page' })).toHaveTextContent('Accueil');
+    expect(screen.getByText('Boîte de réception')).toBeInTheDocument();
   });
 });
 
