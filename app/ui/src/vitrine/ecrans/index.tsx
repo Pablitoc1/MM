@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { assetUrl } from '../../api';
 import { Shell, type NavKey } from '../../components/ui';
 import { EcranAccueil } from './Accueil';
+import { EcranEffectif } from './Effectif';
 import { EcranJoueur } from './Joueur';
 
 export type EcranId = 'accueil' | 'effectif' | 'joueur' | 'entrainement' | 'draft' | 'pause' | 'apres-match';
@@ -12,6 +13,7 @@ interface EcranDef { id: EcranId; label: string; nav?: NavKey; shell: boolean; a
 
 export const ECRANS: EcranDef[] = [
   { id: 'accueil', label: 'Accueil', nav: 'accueil', shell: true, render: () => <EcranAccueil /> },
+  { id: 'effectif', label: 'Effectif', nav: 'effectif', shell: true, render: () => <EcranEffectif /> },
   { id: 'joueur', label: 'Fiche joueur', nav: 'effectif', shell: true, render: () => <EcranJoueur /> },
 ];
 
