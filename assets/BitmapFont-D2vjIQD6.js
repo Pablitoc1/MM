@@ -1,1 +1,0 @@
-export{t as BitmapFont}from"./renderer-I_TKmDVs.js";
