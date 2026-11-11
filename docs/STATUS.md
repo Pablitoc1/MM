@@ -29,8 +29,8 @@ Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novemb
 
 ## En parallèle : la draft (partie draft de M7, en avance, accord de Yahia)
 Fil « Construire la draft ». Fait : données (PR #18, note 008), règles et connaissance du patch
-(note 011). La saison 2026 suit la vraie méta de chaque patch ; à partir de 2027, patches
-générés (M9). À venir : IA de draft (note 012), puis écran Draft branché.
+(note 011), IA de draft (note 012, `just rapport-draft`). La saison 2026 suit la vraie méta
+de chaque patch ; à partir de 2027, patches générés (M9). À venir : écran Draft branché.
 
 ## En parallèle (préparation de M6, hors plan)
 Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
