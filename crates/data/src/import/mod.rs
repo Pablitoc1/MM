@@ -11,6 +11,7 @@
 //! ne refait pas les requêtes (supprime le dossier pour tout retélécharger).
 
 pub mod ddragon;
+pub mod draft;
 pub mod http;
 pub mod leaguepedia;
 pub mod liquipedia;
@@ -84,6 +85,9 @@ pub fn run(opts: &Options) -> Result<()> {
     eprintln!("Oracle's Elixir (notes des joueurs)…");
     let notes = oracles::import(&fetch, &opts.root.join("data/raw/oracles"), &tx, &leagues)?;
 
+    eprintln!("Oracle's Elixir (draft)…");
+    let draft = draft::import(&tx, &opts.root.join("data/raw/oracles"), &leagues)?;
+
     eprintln!("Liquipedia (photos et logos)…");
     let slow = Fetcher::with_delay(
         opts.root.join("data/raw"),
@@ -119,7 +123,36 @@ pub fn run(opts: &Options) -> Result<()> {
 
     eprintln!("{summary}, {images}");
     eprintln!("{notes}");
+    eprintln!("{draft}");
     eprintln!("Base écrite : {}", opts.out.display());
+    Ok(())
+}
+
+/// Refait seulement les données de la draft dans une base existante (sans réseau) :
+/// `just seed-draft`. Les tables de la draft sont recréées de zéro.
+pub fn run_draft_only(opts: &Options) -> Result<()> {
+    let leagues = read_leagues(&opts.root.join("data/leagues.toml"))?;
+    let mut conn = Connection::open(&opts.out)?;
+    let tx = conn.transaction()?;
+    for t in [
+        "champion_meta",
+        "champion_meta_roles",
+        "player_pool",
+        "champion_profile",
+        "pro_drafts",
+    ] {
+        tx.execute_batch(&format!("DROP TABLE IF EXISTS {t}"))?;
+    }
+    tx.execute_batch(schema::DRAFT)?;
+    let draft = draft::import(&tx, &opts.root.join("data/raw/oracles"), &leagues)?;
+    tx.pragma_update(None, "user_version", schema::SCHEMA_VERSION)?;
+    tx.execute(
+        "UPDATE meta SET value = ?1 WHERE key = 'schema_version'",
+        params![schema::SCHEMA_VERSION.to_string()],
+    )?;
+    tx.commit()?;
+    conn.execute_batch("VACUUM")?;
+    eprintln!("{draft}");
     Ok(())
 }
 
