@@ -31,7 +31,7 @@ Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novemb
 Fil « Construire la draft ». Fait : données (PR #18, note 008), règles et connaissance du patch
 (note 011), IA de draft (note 012, `just rapport-draft`). La saison 2026 suit la vraie méta
 de chaque patch ; à partir de 2027, patches générés (M9). Écran Draft branché (note 013,
-captures dans `docs/demo/draft/`) : en attente de la validation de Yahia. Ensuite : la
+captures dans `docs/demo/draft/`), validé par Yahia le 2026-11-11. Ensuite : la
 composition finale passe au moteur de match.
 
 ## En parallèle (préparation de M6, hors plan)
