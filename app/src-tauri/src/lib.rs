@@ -61,16 +61,28 @@ fn player(seed: State<Seed>, person_id: String) -> Result<Option<PlayerDetail>, 
     with_db(&seed, |db| db.player(&person_id))
 }
 
-/// Simule une partie entre deux clubs de LEC et renvoie son flux pour la vue 2D (M3 : 15 min de farm).
+/// Simule une partie entre deux clubs de LEC et renvoie son flux pour la vue 2D (15 min).
+/// Si une draft entre ces deux clubs est terminée, les champions choisis sont joués.
 #[tauri::command]
 fn simulate_match(
     seed: State<Seed>,
+    draft: State<DraftState>,
     blue: String,
     red: String,
     match_seed: u64,
 ) -> Result<mm_world::mm_engine::Replay, String> {
+    use mm_world::draft::Side;
+    let guard = draft.0.lock().map_err(|e| e.to_string())?;
+    let picks = guard.as_ref().and_then(|s| {
+        let b = s.draft.lineup(Side::Blue, &s.blue)?;
+        let r = s.draft.lineup(Side::Red, &s.red)?;
+        Some((s.blue.id.clone(), b, s.red.id.clone(), r))
+    });
     let db = seed.0.lock().map_err(|e| e.to_string())?;
-    let setup = mm_world::lineup::lec_match(&db, &blue, &red, match_seed, 15.0)
+    let drafted = picks
+        .as_ref()
+        .map(|(b, pb, r, pr)| (b.as_str(), pb.as_slice(), r.as_str(), pr.as_slice()));
+    let setup = mm_world::lineup::drafted_match(&db, &blue, &red, drafted, match_seed, 15.0)
         .map_err(|e| e.to_string())?;
     Ok(mm_world::mm_engine::simulate(&setup).replay)
 }

@@ -173,8 +173,8 @@ impl Champ {
     pub(super) fn level_up(&mut self) {
         let level = self.level() as usize;
         let spent: usize = self.fighter.ranks.iter().sum();
-        for n in spent..level.min(18) {
-            self.fighter.ranks[SKILL_ORDER[n]] += 1;
+        for &s in SKILL_ORDER.iter().take(level.min(18)).skip(spent) {
+            self.fighter.ranks[s] += 1;
         }
     }
 

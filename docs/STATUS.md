@@ -51,7 +51,9 @@ Les attributs des notes M2 sont lus par le moteur (farm et mécanique en M3).
 ## M4 · où on en est
 M4a : les sorts des 172 champions du patch 26.1, lus dans les fichiers du jeu (CommunityDragon,
 complété par Meraki), table `champion_kits`, `just seed-kits`, contrôle de chaque sort (note 011).
-Ensuite : le combat (M4b), puis les objets et le rapport sur 1 000 parties (M4c).
+M4b : combat au quart de seconde (sorts, contrôles, tours, morts, primes, réapparition) et
+champions de la draft joués par le moteur (note 012, rapport `docs/demo/M4/rapport-combat.md`).
+Ensuite : les objets et le rapport sur 1 000 parties complètes (M4c).
 
 ## Ce qui manque
 M4 en cours (voir plus haut), puis M5 · IA d'équipe.
