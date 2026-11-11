@@ -76,6 +76,7 @@ const NUM_COLS: [&str; 23] = [
 /// Une ligne du CSV, réduite à ce qui sert.
 struct Row {
     game: String,
+    date: String,
     league: String,
     position: String,
     player: String,
@@ -184,6 +185,7 @@ fn parse(bytes: &[u8]) -> Result<Vec<Row>> {
     let col = |name: &str| headers.iter().position(|h| h == name);
     let text = [
         "gameid",
+        "date",
         "league",
         "position",
         "playername",
@@ -209,13 +211,14 @@ fn parse(bytes: &[u8]) -> Result<Vec<Row>> {
         };
         rows.push(Row {
             game: get(text[0]),
-            league: get(text[1]),
-            position: get(text[2]),
-            player: get(text[3]),
-            player_id: get(text[4]),
-            team: get(text[5]),
-            team_id: get(text[6]),
-            champion: get(text[7]),
+            date: get(text[1]),
+            league: get(text[2]),
+            position: get(text[3]),
+            player: get(text[4]),
+            player_id: get(text[5]),
+            team: get(text[6]),
+            team_id: get(text[7]),
+            champion: get(text[8]),
             nums: nums.map(num),
         });
     }
@@ -228,6 +231,19 @@ struct YearData {
     cross: Vec<(String, String, bool)>,
     /// Pseudo en minuscules → identifiants Oracle's Elixir.
     names: Vec<(String, String)>,
+    /// Parties d'équipe, pour l'Elo : (date, partie, équipe A, ligue A, équipe B, ligue B, A gagne, grand match).
+    games: Vec<TeamGame>,
+    /// Pour chaque ligne de `lines` : (partie, équipe), pour lui rattacher l'Elo.
+    line_teams: Vec<(String, String)>,
+}
+
+struct TeamGame {
+    date: String,
+    game: String,
+    year: u16,
+    teams: [(String, String); 2], // (équipe, ligue maison)
+    a_won: bool,
+    big: bool,
 }
 
 /// Transforme les lignes d'une année. La ligue d'une partie est la ligue « maison »
@@ -274,22 +290,33 @@ fn year_data(rows: &[Row], year: u16, oe_to_ours: &HashMap<String, String>) -> Y
         }
     }
     let mut cross = Vec::new();
+    let mut games = Vec::new();
     for teams in by_game.values() {
         if let [a, b] = teams.as_slice() {
             let (la, lb) = (home(a), home(b));
             if la != lb {
-                cross.push((la, lb, a.win()));
+                cross.push((la.clone(), lb.clone(), a.win()));
             }
+            games.push(TeamGame {
+                date: a.date.clone(),
+                game: a.game.clone(),
+                year,
+                teams: [(a.team_key(), la), (b.team_key(), lb)],
+                a_won: a.win(),
+                big: a.playoffs() || CROSS_LEAGUE.contains(&a.league.as_str()),
+            });
         }
     }
 
     let mut lines = Vec::new();
+    let mut line_teams = Vec::new();
     let mut names = BTreeSet::new();
     for r in rows {
         let Some(role) = Role::from_oe(&r.position) else {
             continue;
         };
         names.insert((r.player.to_lowercase(), r.player_key()));
+        line_teams.push((r.game.clone(), r.team_key()));
         let fb = match (r.f("firstbloodkill"), r.f("firstbloodassist")) {
             (None, None) => None,
             (k, a) => Some(k.unwrap_or(0.0) + a.unwrap_or(0.0) > 0.0),
@@ -323,12 +350,16 @@ fn year_data(rows: &[Row], year: u16, oe_to_ours: &HashMap<String, String>) -> Y
             deaths_15: r.f("deathsat15"),
             first_blood: fb,
             team_gold_diff_15: team_gd15.get(&(r.game.as_str(), r.team_key())).copied(),
+            team_strength: None,
+            team_game: team_game_id(&r.game, &r.team_key()),
         });
     }
     YearData {
         lines,
         cross,
         names: names.into_iter().collect(),
+        games,
+        line_teams,
     }
 }
 
@@ -376,6 +407,8 @@ pub fn import(
     }
 
     let mut lines = Vec::new();
+    let mut line_teams = Vec::new();
+    let mut team_games = Vec::new();
     let mut cross = Vec::new();
     let mut names: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut years = 0;
@@ -386,6 +419,8 @@ pub fn import(
         years += 1;
         let data = year_data(&rows, year, &oe_to_ours);
         lines.extend(data.lines);
+        line_teams.extend(data.line_teams);
+        team_games.extend(data.games);
         for (name, key) in data.names {
             names.entry(name).or_default().insert(key);
         }
@@ -431,7 +466,8 @@ pub fn import(
             weight: n * MATCH_WEIGHT,
         })
         .collect();
-    let transfers = bridges(&ratings::seasons(&lines, 10));
+    let seasons = ratings::seasons(&lines, 10);
+    let transfers = bridges(&seasons);
     let mut transfers_per_league: BTreeMap<&str, usize> = BTreeMap::new();
     for t in &transfers {
         *transfers_per_league.entry(&t.a).or_default() += 1;
@@ -480,6 +516,14 @@ pub fn import(
         )?;
     }
 
+    // Force des équipes : Elo mondial sur toutes les parties, dans l'ordre des dates.
+    let elo = team_elo(&mut team_games, &offsets);
+    for (g, key) in lines.iter_mut().zip(&line_teams) {
+        if let Some(e) = elo.get(key) {
+            g.team_strength = Some((e - ELO_LEC) / ELO_PER_SD);
+        }
+    }
+
     let params_ = Params {
         year_weight: form_weight,
         career_weight,
@@ -512,6 +556,7 @@ pub fn import(
         bridges: n_transfers,
         cross_matches: cross.len(),
     };
+    let mut chosen_all = Vec::new();
     for (person, handle, role, league, birthdate) in &people {
         let candidates = names.get(&handle.to_lowercase());
         let chosen = candidates.and_then(|c| {
@@ -525,6 +570,44 @@ pub fn import(
                     )
                 })
         });
+        chosen_all.push((person, role, league, birthdate, chosen));
+    }
+
+    // Progression selon l'âge : saisons successives des joueurs dont on connaît la
+    // date de naissance (niveau de la saison = niveau de la ligue + écart avec elle).
+    let mut birth_year: HashMap<&str, i32> = HashMap::new();
+    for (_, _, _, birthdate, chosen) in &chosen_all {
+        if let (Some(b), Some((key, _))) = (birthdate.as_deref(), chosen) {
+            if let Some(y) = b.get(0..4).and_then(|y| y.parse().ok()) {
+                birth_year.insert(key.as_str(), y);
+            }
+        }
+    }
+    let mut by_player_year: BTreeMap<(&str, u16), (f64, u32)> = BTreeMap::new();
+    for s in &seasons {
+        if birth_year.contains_key(s.player.as_str()) {
+            let off = offsets.get(&s.league).copied().unwrap_or(TIER_DEFAULT[2]);
+            let e = by_player_year.entry((&s.player, s.year)).or_default();
+            e.0 += (off + s.z) * s.games as f64;
+            e.1 += s.games;
+        }
+    }
+    let mut pairs = Vec::new();
+    for ((player, year), (sum, n)) in &by_player_year {
+        if let Some((next_sum, next_n)) = by_player_year.get(&(*player, year + 1)) {
+            let age = (*year as i32 - birth_year[player]).max(0) as u32;
+            let delta = 10.0 * (next_sum / *next_n as f64 - sum / *n as f64);
+            pairs.push((age, delta));
+        }
+    }
+    let curve = ratings::AgeCurve::from_pairs(&pairs);
+    if std::env::var("MM_DEBUG").is_ok() {
+        for (a, (m, sd, n)) in &curve.by_age {
+            eprintln!("âge {a} : {m:+.1} points/an (écart-type {sd:.1}, {n} cas)");
+        }
+    }
+
+    for (person, role, league, birthdate, chosen) in chosen_all {
         let age = age_on_start(birthdate.as_deref());
         let (rating, source) = match chosen {
             Some((_, r)) => {
@@ -541,9 +624,66 @@ pub fn import(
                 (unrated(role, league, off), "estimé")
             }
         };
-        write_rating(tx, person, &rating, age, source)?;
+        let potential = curve.potential(rating.level.value, age);
+        write_rating(tx, person, &rating, potential, source)?;
     }
     Ok(sum)
+}
+
+/// Identifiant stable d'une équipe dans une partie (FNV-1a, déterministe).
+fn team_game_id(game: &str, team: &str) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in game.bytes().chain([0u8]).chain(team.bytes()) {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Elo de référence : une équipe moyenne de la LEC.
+const ELO_LEC: f64 = 1500.0;
+/// Points d'Elo pour un écart-type de niveau : 1 écart-type = 0,9 log-cote / 0,9
+/// (voir LOGODDS_TO_LEVEL) ; une log-cote vaut 400 / ln 10 = 173,7 points d'Elo.
+const ELO_PER_SD: f64 = 173.7 / ratings::LOGODDS_TO_LEVEL;
+/// Ce que gagne ou perd une équipe par partie. Grands matchs (playoffs,
+/// international) : × 1,5. // estimé, valeurs usuelles des Elo d'esport.
+const ELO_K: f64 = 24.0;
+/// Au début de chaque année (changements d'effectif), l'Elo d'une équipe revient
+/// d'un tiers vers le niveau mesuré de sa ligue. // estimé
+const ELO_SEASON_REGRESSION: f64 = 1.0 / 3.0;
+
+/// Elo de chaque équipe avant chaque partie : clé (partie, équipe). Une équipe
+/// nouvelle part du niveau mesuré de sa ligue (`offsets`).
+fn team_elo(
+    games: &mut [TeamGame],
+    offsets: &BTreeMap<String, f64>,
+) -> HashMap<(String, String), f64> {
+    games.sort_by(|a, b| {
+        (a.date.as_str(), a.game.as_str()).cmp(&(b.date.as_str(), b.game.as_str()))
+    });
+    let league_base =
+        |l: &str| ELO_LEC + ELO_PER_SD * offsets.get(l).copied().unwrap_or(TIER_DEFAULT[2]);
+    let mut rating: HashMap<String, (f64, u16)> = HashMap::new();
+    let mut out = HashMap::new();
+    for g in games.iter() {
+        let mut pre = [0.0; 2];
+        for (i, (team, league)) in g.teams.iter().enumerate() {
+            let base = league_base(league);
+            let e = rating.entry(team.clone()).or_insert((base, g.year));
+            if e.1 != g.year {
+                e.0 += (base - e.0) * ELO_SEASON_REGRESSION;
+                e.1 = g.year;
+            }
+            pre[i] = e.0;
+            out.insert((g.game.clone(), team.clone()), e.0);
+        }
+        let expected = 1.0 / (1.0 + 10f64.powf((pre[1] - pre[0]) / 400.0));
+        let k = if g.big { ELO_K * 1.5 } else { ELO_K };
+        let delta = k * (if g.a_won { 1.0 } else { 0.0 } - expected);
+        rating.get_mut(&g.teams[0].0).unwrap().0 += delta;
+        rating.get_mut(&g.teams[1].0).unwrap().0 -= delta;
+    }
+    out
 }
 
 /// A priori par tier, en écarts-types de niveau par rapport à la LEC : ne sert que
@@ -574,8 +714,8 @@ fn unrated(role: &str, league: &str, offset: f64) -> PlayerRating {
         "Bot" => Role::Bot,
         _ => Role::Support,
     };
-    let v20 = (10.5 + 3.0 * offset).clamp(1.0, 20.0);
-    let v100 = (60.0 + 10.0 * offset).clamp(25.0, 99.0);
+    let v100 = (75.0 + 10.0 * offset).clamp(25.0, 99.0);
+    let v20 = (v100 / 5.0).clamp(1.0, 20.0);
     PlayerRating {
         role,
         league: league.to_string(),
@@ -587,8 +727,8 @@ fn unrated(role: &str, league: &str, offset: f64) -> PlayerRating {
                     *a,
                     Score {
                         value: v20,
-                        low: (v20 - 3.0).max(1.0),
-                        high: (v20 + 3.0).min(20.0),
+                        low: (v20 - 2.0).max(1.0),
+                        high: (v20 + 2.0).min(20.0),
                         estimated: true,
                     },
                 )
@@ -616,10 +756,9 @@ fn write_rating(
     tx: &Transaction,
     person: &str,
     r: &PlayerRating,
-    age: Option<u32>,
+    potential: f64,
     source: &str,
 ) -> Result<()> {
-    let potential = ratings::potential(r.level.value, age);
     tx.execute(
         "INSERT INTO player_ratings (person_id, role, games, level, level_low, level_high, potential, source)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
