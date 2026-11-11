@@ -32,9 +32,9 @@ voies et alcôves : relevés sur la minimap Data Dragon 16.22 et contrôlés en 
 l'image ; marqués `// estimé`.
 
 ## Images
-`app/ui/public/match/` : minimap et icônes de champions de Data Dragon 16.22.1, icônes des camps
-et des sbires reprises de la maquette v2. Quand M1 aura importé Data Dragon, les icônes de
-champions viendront de la base.
+`app/ui/src/match/assets/` : minimap Data Dragon 16.22.1, icônes des camps
+et des sbires reprises de la maquette v2. Les icônes de champions viennent de la base
+de départ (M1, `data/seed/public/champions`).
 
 ## Nouvelle dépendance
 PixiJS 8 (rendu 2D WebGL), prévu dans la stack (note 001). Chargé seulement sur l'écran du match.
