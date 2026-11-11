@@ -15,6 +15,16 @@
   --accent-gold: #c8aa6e; /* icônes de rôle, étoiles */
   --gold-value: #e2c46b;
 
+  /* Carte du match en direct (maquette « match en direct v2 »). */
+  --map-camp: #c9b37a;
+  --map-camp-taken: #6b7488;
+  --map-ward: #f5d76e;
+  --map-alcove: #5e6450;
+  --map-stone: #3a4256;
+  --map-stone-light: #6b7488;
+  --map-rubble: #4a5266;
+  --map-kill: #e0614f;
+
   --font-body: 'Inter', system-ui, sans-serif;
   --font-title: 'Space Grotesk', 'Inter', sans-serif;
   --radius: 12px;

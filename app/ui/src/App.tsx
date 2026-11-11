@@ -4,6 +4,7 @@ import { SideNav } from './components/SideNav';
 import { TopBar } from './components/TopBar';
 import { NAV, type ScreenId } from './nav';
 import { Home } from './screens/Home';
+import { MatchLive } from './screens/MatchLive';
 import { Placeholder } from './screens/Placeholder';
 
 export function App() {
@@ -22,7 +23,9 @@ export function App() {
       <div className="body">
         <SideNav active={screen} onSelect={setScreen} />
         <main className="main">
-          {screen === 'accueil' ? <Home world={world} /> : <Placeholder item={item} />}
+          {screen === 'accueil' && <Home world={world} />}
+          {screen === 'match' && <MatchLive />}
+          {screen !== 'accueil' && screen !== 'match' && <Placeholder item={item} />}
         </main>
       </div>
     </div>

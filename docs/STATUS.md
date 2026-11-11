@@ -13,6 +13,10 @@ Prochain jalon : M1, à lancer quand Yahia dit « go M1 ».
   La date de la barre du haut vient du Rust via la commande Tauri `world_info`.
 - `just check` (Rust + interface), `just demo M0`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
 
+## En parallèle (préparation de M6, hors plan)
+Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
+(note 003), captures dans `docs/demo/vue-2d/` (`just demo vue-2d`). Le plan ne change pas.
+
 ## Ce qui manque (prochain jalon)
 M1 · Base de données et import réel : schéma SQLite, import Data Dragon, Leaguepedia (toutes les ligues tier 1 à 3), Oracle's Elixir.
 
