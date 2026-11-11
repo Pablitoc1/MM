@@ -114,13 +114,19 @@ export function AttributeBar({ name, value, range, trend }: AttributeBarProps) {
 }
 
 /** Barre de pronostic : nous à gauche (teal), l'adversaire à droite (orange). */
-export function ProbabilityBar({ us, label = 'Probabilité de victoire' }: { us: number; label?: string }) {
+export function ProbabilityBar({ us, label = 'Probabilité de victoire', showLabel = false, height = 6 }: {
+  us: number; label?: string;
+  /** Libellé écrit à droite, comme dans le bandeau du match en direct. */
+  showLabel?: boolean;
+  height?: number;
+}) {
   const p = Math.round(clamp(us, 0, 100));
   return (
     <div className="ui-proba" role="img" aria-label={`${label} : ${p} % contre ${100 - p} %`}>
       <span className="ui-proba__us">{p} %</span>
-      <span className="ui-proba__bar"><span style={{ width: `${p}%` }} /></span>
+      <span className="ui-proba__bar" style={{ height, borderRadius: height / 2 }}><span style={{ width: `${p}%` }} /></span>
       <span className="ui-proba__them">{100 - p} %</span>
+      {showLabel && <span className="ui-proba__label" aria-hidden="true">{label}</span>}
     </div>
   );
 }

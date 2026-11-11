@@ -24,6 +24,9 @@
   --row-hover: #1c2537;     /* survol d'une ligne de tableau */
   --warn-bg: #2a2418;       /* bandeau d'alerte orange */
   --hero-bg: #1b2a3a;       /* départ du dégradé des cartes en avant */
+  --tower-body: #3a4256;    /* tours (repères et carte) */
+  --tower-light: #5a6378;
+  --tower-top: #6b7488;
 
   --font-body: 'Inter', system-ui, sans-serif;
   --font-title: 'Space Grotesk', 'Inter', sans-serif;

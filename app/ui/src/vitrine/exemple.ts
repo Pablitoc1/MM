@@ -61,12 +61,21 @@ export const ECART_OR = [
   0, 0, 20, -60, -150, -220, -80, -300, -420, -150, 100, 350, 620, 800, 700, 1150, 1500, 1700, 2400,
 ];
 
+/** Repères de la maquette du match en direct (minute, équipe, icône). */
 export const EVENEMENTS_OR: GoldEvent[] = [
-  { minute: 5, side: 'them', kind: 'dragon', label: 'Premier dragon pour G2' },
-  { minute: 8, side: 'them', kind: 'tour', label: 'Tour du bas détruite par G2' },
-  { minute: 11, side: 'us', kind: 'kill', champion: champ('XinZhao', 'Xin Zhao'), label: 'Gank top de Yike, premier sang' },
-  { minute: 15, side: 'us', kind: 'larves', label: 'Larves du Néant pour KC' },
-  { minute: 18, side: 'us', kind: 'kill', champion: champ('Varus'), label: 'Combat au dragon gagné 4 pour 1' },
+  { minute: 3.5, side: 'them', kind: 'kill', champion: champ('Gnar'), label: 'BrokenBlade élimine Canna' },
+  { minute: 5.5, side: 'them', kind: 'dragon', label: 'Premier dragon pour G2' },
+  { minute: 8.2, side: 'them', kind: 'kill', champion: champ('Syndra'), label: 'Caps élimine kyeahoo' },
+  { minute: 9.6, side: 'us', kind: 'larves', label: 'Yike vole les larves du néant' },
+  { minute: 11.2, side: 'us', kind: 'kill', champion: champ('XinZhao', 'Xin Zhao'), label: 'Gank top de Yike, premier sang' },
+  {
+    minute: 13.4, side: 'us', kind: 'kill', badge: '⚔ 3 – 1', highlight: true, label: 'Combat au dragon gagné 3 pour 1',
+    icons: [championIcon('Orianna'), championIcon('XinZhao'), championIcon('Renekton')],
+  },
+  { minute: 15.2, side: 'them', kind: 'kill', champion: champ('Ezreal'), label: 'Hans Sama élimine Busio' },
+  { minute: 16.4, side: 'us', kind: 'kill', champion: champ('Varus'), badge: '×2', highlight: true, label: 'Double kill de Caliste' },
+  { minute: 17.3, side: 'us', kind: 'tour', label: 'KC détruit la tour bot extérieure' },
+  { minute: 18.4, side: 'us', kind: 'kill', champion: champ('Varus'), label: 'Caliste élimine Hans Sama' },
 ];
 
 export const MOMENTS: KeyMoment[] = [

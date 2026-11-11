@@ -165,10 +165,31 @@ describe('événements de la courbe d\'or', () => {
       { minute: 2, side: 'us', kind: 'tour', label: 'Tour pour KC' },
       { minute: 3, side: 'us', kind: 'kill', champion: { name: 'Varus', icon: '/champions/Varus.png' }, label: 'Kill' },
     ]} />);
-    expect(container.querySelectorAll('svg[role="img"] title')).toHaveLength(3);
-    expect(container.querySelector('svg[role="img"] title')).toHaveTextContent('1 min · Dragon pour G2');
+    const marks = container.querySelectorAll('.ui-gold-mark');
+    expect(marks).toHaveLength(3);
+    expect(marks[0]).toHaveAttribute('title', 'Dragon pour G2');
+    expect(container.querySelector('svg text[font-weight="700"]')).toHaveTextContent('+900'); // pastille de fin
     for (const t of ['Dragon', 'Tour', 'Kill (tueur)']) expect(screen.getByText(t)).toBeInTheDocument();
     expect(screen.queryByText('Nashor')).not.toBeInTheDocument();
+  });
+});
+
+describe('courbe d\'or : options du match en direct', () => {
+  it('regroupe les icônes d\'un combat avec leur badge et peut masquer la légende', () => {
+    const { container } = render(<GoldDiffChart values={[0, 500, 2400]} us="KC" them="G2" legend={false} events={[
+      { minute: 1, side: 'us', kind: 'kill', icons: ['/a.png', '/b.png', '/c.png'], badge: '⚔ 3 – 1', label: 'Combat' },
+      { minute: 2, side: 'us', kind: 'kill', icon: '/v.png', badge: '×2', highlight: true, label: 'Double kill' },
+    ]} />);
+    expect(container.querySelectorAll('.ui-gold-mark img')).toHaveLength(4);
+    expect(screen.getByText('⚔ 3 – 1')).toHaveClass('ui-gold-mark__badge--top');
+    expect(screen.getByText('×2')).toHaveClass('ui-gold-mark__badge--corner');
+    expect(screen.queryByText('Kill (tueur)')).not.toBeInTheDocument();
+    expect(norm(screen.getByText(/2,4k/).textContent)).toBe('+2,4k');
+  });
+
+  it('écrit le libellé de la probabilité à droite si demandé', () => {
+    render(<ProbabilityBar us={64} showLabel />);
+    expect(screen.getByText('Probabilité de victoire')).toBeInTheDocument();
   });
 });
 

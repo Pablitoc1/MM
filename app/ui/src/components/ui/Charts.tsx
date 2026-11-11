@@ -54,69 +54,88 @@ export const OBJECTIVE_ICON: Partial<Record<GoldEventKind, string>> = {
 };
 
 export interface GoldEvent {
+  /** Minute de l'événement (décimales acceptées : 11.7 = 11 min 42). */
   minute: number;
   side: 'us' | 'them';
   kind: GoldEventKind;
   /** Pour un kill : le champion du tueur. */
   champion?: ChampionRef;
+  /** Icône à afficher, prioritaire sur celle du champion ou de l'objectif. */
+  icon?: string;
+  /** Plusieurs icônes qui se chevauchent (combat d'équipe : les tueurs). */
+  icons?: string[];
+  /** Petit badge : « ⚔ 3 – 1 » au-dessus d'un combat, « ×2 » sur un multi-kill. */
+  badge?: string;
+  /** Moment fort : halo et trait plus marqué. */
+  highlight?: boolean;
   /** Ce qui s'est passé : « Premier sang de Yike ». */
   label: string;
 }
 
+const sideVar = (side: 'us' | 'them') => (side === 'us' ? 'var(--team-us)' : 'var(--team-them)');
+
 /** Tour stylisée des maquettes, avec la gemme à la couleur de l'équipe. */
-function TowerGlyph({ x, y, color }: { x: number; y: number; color: string }) {
+export function TowerIcon({ side = 'us', width = 14 }: { side?: 'us' | 'them'; width?: number }) {
   return (
-    <g transform={`translate(${x - 6} ${y - 8}) scale(0.6)`}>
-      <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--border-strong)" stroke="var(--bg-page)" strokeWidth={1.2} />
-      <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--text-muted)" stroke="var(--bg-page)" strokeWidth={1} />
-      <path d="M10 1 L14 6 L10 10 L6 6 Z" fill={color} stroke="var(--bg-page)" strokeWidth={1} />
-    </g>
+    <svg width={width} height={(width * 26) / 20} viewBox="0 0 20 26" aria-hidden="true" style={{ display: 'block' }}>
+      <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--tower-body)" stroke="var(--bg-page)" strokeWidth={1.2} />
+      <path d="M6 25 L7.5 14 L9 25 Z" fill="var(--tower-light)" />
+      <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--tower-top)" stroke="var(--bg-page)" strokeWidth={1} />
+      <path d="M10 1 L14 6 L10 10 L6 6 Z" fill={sideVar(side)} stroke="var(--bg-page)" strokeWidth={1} />
+      <circle cx="10" cy="5.5" r="1.4" fill="var(--text)" fillOpacity={0.8} />
+    </svg>
   );
 }
 
-/** Marqueur d'un événement posé sur la courbe : icône ronde cerclée à la couleur de l'équipe. */
-function GoldMarker({ e, cx, cy, uid, i }: { e: GoldEvent; cx: number; cy: number; uid: string; i: number }) {
-  const color = e.side === 'us' ? 'var(--team-us)' : 'var(--team-them)';
-  const src = e.kind === 'kill' ? e.champion?.icon : OBJECTIVE_ICON[e.kind];
-  const r = 10;
-  const clip = `gm${uid}-${i}`;
+/** Étoile de combat derrière un regroupement d'icônes. */
+function Burst({ side }: { side: 'us' | 'them' }) {
+  const pts = Array.from({ length: 16 }, (_, i) => {
+    const r = i % 2 ? 6.5 : 12;
+    const a = (Math.PI * i) / 8;
+    return `${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
   return (
-    <g>
-      <title>{`${e.minute} min · ${e.label}`}</title>
-      {e.kind === 'tour' ? (
-        <>
-          <circle cx={cx} cy={cy} r={r} fill="var(--bg-card)" stroke={color} strokeWidth={2} />
-          <TowerGlyph x={cx} y={cy} color={color} />
-        </>
-      ) : (
-        <>
-          <clipPath id={clip}><circle cx={cx} cy={cy} r={r} /></clipPath>
-          <circle cx={cx} cy={cy} r={r} fill="var(--bg-active)" />
-          {src && <image href={src} x={cx - r} y={cy - r} width={r * 2} height={r * 2} clipPath={`url(#${clip})`} />}
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={2} />
-        </>
+    <span className="ui-gold-mark__burst" aria-hidden="true">
+      <svg viewBox="-13 -13 26 26" width="52" height="52"><polygon points={pts} fill={sideVar(side)} fillOpacity={0.35} /></svg>
+    </span>
+  );
+}
+
+/** Repère d'un événement, posé au-dessus de la courbe (HTML par-dessus le SVG). */
+function GoldMarker({ e }: { e: GoldEvent }) {
+  const color = sideVar(e.side);
+  const icons = e.icons ?? [e.icon ?? (e.kind === 'kill' ? e.champion?.icon : OBJECTIVE_ICON[e.kind])].filter(Boolean) as string[];
+  if (e.kind === 'tour' && !e.icon && !e.icons) {
+    return <span className="ui-gold-mark" title={e.label}><TowerIcon side={e.side} /></span>;
+  }
+  const group = icons.length > 1;
+  return (
+    <span className="ui-gold-mark" title={e.label}>
+      {group && <Burst side={e.side} />}
+      <span className="ui-gold-mark__icons">
+        {icons.map((src, i) => (
+          <img key={i} src={src} alt="" width={group ? 20 : 22} height={group ? 20 : 22}
+            style={{ borderColor: color, marginLeft: i ? -8 : 0, boxShadow: e.highlight ? `0 0 0 2px var(--bg-page), 0 0 10px 2px ${color}` : undefined }} />
+        ))}
+        {icons.length === 0 && <span className="ui-gold-mark__empty" style={{ borderColor: color }} />}
+      </span>
+      {e.badge && (
+        <span className={group ? 'ui-gold-mark__badge ui-gold-mark__badge--top' : 'ui-gold-mark__badge ui-gold-mark__badge--corner'}
+          style={{ background: color }}>{e.badge}</span>
       )}
-    </g>
+    </span>
   );
 }
 
-/** Légende des marqueurs, comme au-dessus de la courbe des maquettes. */
-function GoldLegend({ kinds, us, them, killIcon }: { kinds: GoldEventKind[]; us: string; them: string; killIcon?: string }) {
+/** Légende des repères, comme au-dessus de la courbe des maquettes. */
+export function GoldLegend({ kinds, us, them, killIcon }: { kinds: GoldEventKind[]; us: string; them: string; killIcon?: string }) {
   return (
     <div className="ui-chart__legend">
       {kinds.map((k) => {
         const src = k === 'kill' ? killIcon : OBJECTIVE_ICON[k];
         return (
           <span key={k} className="ui-inline" style={{ gap: 5 }}>
-            {k === 'tour' ? (
-              <svg width="12" height="16" viewBox="0 0 20 26" aria-hidden="true">
-                <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--border-strong)" />
-                <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--text-muted)" />
-                <path d="M10 1 L14 6 L10 10 L6 6 Z" fill="var(--team-us)" />
-              </svg>
-            ) : src ? (
-              <img src={src} alt="" width={16} height={16} style={{ borderRadius: '50%' }} />
-            ) : null}
+            {k === 'tour' ? <TowerIcon width={12} /> : src ? <img src={src} alt="" width={16} height={16} style={{ borderRadius: '50%' }} /> : null}
             {GOLD_EVENT_LABEL[k]}
           </span>
         );
@@ -132,15 +151,32 @@ export interface GoldDiffChartProps {
   us: string;
   them: string;
   events?: GoldEvent[];
+  /** Légende des repères (par défaut quand il y a des repères). */
+  legend?: boolean;
+  /** Résumé en tête (« KC +2 400 · max G2 −420 (8 min) · bascule à 10 min »). */
+  summary?: boolean;
+  /** Pastille de la valeur finale au bout de la courbe (« +2,4k »). */
+  finalPill?: boolean;
+}
+
+/** « +2,4k », « −420 » : valeur courte pour la pastille et les axes. */
+export function formatK(v: number): string {
+  const sign = v > 0 ? '+' : v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  if (a < 1000) return `${sign}${formatNombre(a)}`;
+  return `${sign}${formatNombre(a / 1000, a % 1000 ? 1 : 0)}k`;
 }
 
 /**
- * Courbe d'écart d'or : teal quand nous menons, orange quand l'adversaire mène.
- * Sert au match en direct (M6), à la pause (M8) et à l'après-match (M8).
+ * Courbe d'écart d'or des maquettes v2 : un point par minute, teal quand nous
+ * menons, orange quand l'adversaire mène ; repères en icônes au-dessus,
+ * reliés à leur minute par un trait. Sert au match (M6), à la pause et à
+ * l'après-match (M8).
  */
-export function GoldDiffChart({ values, us, them, events = [] }: GoldDiffChartProps) {
+export function GoldDiffChart({ values, us, them, events = [], legend, summary = true, finalPill = true }: GoldDiffChartProps) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const W = 620, H = 250, left = 46, right = 600, top = 16, bottom = 222;
+  const hasMarks = events.length > 0;
+  const W = 620, H = 250, left = 46, right = 568, top = hasMarks ? 52 : 16, bottom = 222, markY = 26;
   const maxAbs = Math.max(...values.map(Math.abs), 1);
   const step = niceStep(maxAbs);
   const lines = Math.max(1, Math.ceil(maxAbs / step));
@@ -151,7 +187,7 @@ export function GoldDiffChart({ values, us, them, events = [] }: GoldDiffChartPr
   const y = (v: number) => mid - ((bottom - top) / 2) * (v / yMax);
   const pts = values.map((v, m) => `${x(m).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   const area = `M${x(0)},${mid} L${pts.replaceAll(' ', ' L')} L${x(values.length - 1)},${mid} Z`;
-  const minuteStep = [1, 2, 3, 5, 10].find((s) => last / s <= 7) ?? 10;
+  const minuteStep = [1, 2, 3, 5, 10].find((st) => last / st <= 7) ?? 10;
   const ticks = Array.from({ length: Math.floor(last / minuteStep) + 1 }, (_, i) => i * minuteStep);
   const levels = Array.from({ length: lines * 2 + 1 }, (_, i) => (i - lines) * step);
   const s = summarizeGold(values);
@@ -160,47 +196,70 @@ export function GoldDiffChart({ values, us, them, events = [] }: GoldDiffChartPr
     + (s.worst.value < 0 ? `, plus grand retard ${formatEcart(s.worst.value)} à ${s.worst.minute} minutes` : '')
     + (s.swingMinute !== undefined ? `, bascule à ${s.swingMinute} minutes` : '');
   const up = `gpos${uid}`, dn = `gneg${uid}`;
+  const showLegend = legend ?? hasMarks;
+  const lastX = x(values.length - 1), lastY = y(s.final);
 
   return (
     <figure className="ui-chart">
-      <figcaption className="ui-chart__caption">
-        <span>{us} <strong style={{ color: s.final >= 0 ? TONE_VAR.good : TONE_VAR.bad }}>{formatEcart(s.final)}</strong></span>
-        {s.worst.value < 0 && (
-          <span> · max {them} <strong style={{ color: TONE_VAR.bad }}>{formatEcart(s.worst.value)}</strong> ({s.worst.minute} min)</span>
-        )}
-        {s.swingMinute !== undefined && <span> · bascule à {s.swingMinute} min</span>}
-      </figcaption>
-      {events.length > 0 && (
-        <GoldLegend us={us} them={them} killIcon={events.find((e) => e.kind === 'kill')?.champion?.icon}
-          kinds={(Object.keys(GOLD_EVENT_LABEL) as GoldEventKind[]).filter((k) => events.some((e) => e.kind === k))} />
+      {(summary || showLegend) && (
+        <div className="ui-chart__head">
+          {showLegend && (
+            <GoldLegend us={us} them={them} killIcon={events.find((e) => e.kind === 'kill')?.champion?.icon}
+              kinds={(Object.keys(GOLD_EVENT_LABEL) as GoldEventKind[]).filter((k) => events.some((e) => e.kind === k))} />
+          )}
+          {summary && (
+            <figcaption className="ui-chart__caption">
+              {us} <strong style={{ color: s.final >= 0 ? TONE_VAR.good : TONE_VAR.bad }}>{formatEcart(s.final)}</strong>
+              {s.worst.value < 0 && <> · max {them} <strong style={{ color: TONE_VAR.bad }}>{formatEcart(s.worst.value)}</strong> ({s.worst.minute} min)</>}
+              {s.swingMinute !== undefined && <> · bascule à {s.swingMinute} min</>}
+            </figcaption>
+          )}
+        </div>
       )}
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={aria} style={{ width: '100%', height: 'auto' }}>
-        <defs>
-          <clipPath id={up}><rect x="0" y="0" width={W} height={mid} /></clipPath>
-          <clipPath id={dn}><rect x="0" y={mid} width={W} height={H - mid} /></clipPath>
-        </defs>
-        {levels.map((v) => (
-          <g key={v}>
-            <line x1={left} x2={right} y1={y(v)} y2={y(v)} stroke={v === 0 ? 'var(--border-strong)' : 'var(--grid-line)'}
-              strokeDasharray={v === 0 ? undefined : '2 4'} />
-            <text x={left - 8} y={y(v) + 4} textAnchor="end" style={AXIS_FONT}
-              fill={v > 0 ? 'var(--teal-text)' : v < 0 ? 'var(--team-them)' : 'var(--text-muted)'}>
-              {v === 0 ? '0' : `${v > 0 ? '+' : '\u2212'}${formatNombre(Math.abs(v) / 1000, Math.abs(v) % 1000 ? 1 : 0)}k`}
-            </text>
-          </g>
+      <div className="ui-gold">
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={aria} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          <defs>
+            <clipPath id={up}><rect x="0" y="0" width={W} height={mid} /></clipPath>
+            <clipPath id={dn}><rect x="0" y={mid} width={W} height={H - mid} /></clipPath>
+          </defs>
+          {levels.map((v) => (
+            <g key={v}>
+              <line x1={left} x2={right} y1={y(v)} y2={y(v)} stroke={v === 0 ? 'var(--border-strong)' : 'var(--grid-line)'}
+                strokeDasharray={v === 0 ? undefined : '2 4'} />
+              <text x={left - 8} y={y(v) + 4} textAnchor="end" style={AXIS_FONT}
+                fill={v > 0 ? 'var(--teal-text)' : v < 0 ? 'var(--team-them)' : 'var(--text-muted)'}>
+                {v === 0 ? '0' : formatK(v)}
+              </text>
+            </g>
+          ))}
+          {ticks.map((m) => (
+            <text key={m} x={x(m)} y={H - 12} textAnchor="middle" fill="var(--text-muted)" style={AXIS_FONT}>{m} min</text>
+          ))}
+          <path d={area} fill="var(--team-us)" fillOpacity={0.22} clipPath={`url(#${up})`} />
+          <path d={area} fill="var(--team-them)" fillOpacity={0.22} clipPath={`url(#${dn})`} />
+          <polyline points={pts} fill="none" stroke="var(--team-us)" strokeWidth={2.5} strokeLinejoin="round" clipPath={`url(#${up})`} />
+          <polyline points={pts} fill="none" stroke="var(--team-them)" strokeWidth={2.5} strokeLinejoin="round" clipPath={`url(#${dn})`} />
+          {values.map((v, m) => (
+            <circle key={m} cx={x(m)} cy={y(v)} r={2.5} fill={v < 0 ? 'var(--team-them)' : 'var(--team-us)'} />
+          ))}
+          {events.map((e, i) => (
+            <line key={i} x1={x(e.minute)} x2={x(e.minute)} y1={markY + 14} y2={bottom} stroke={sideVar(e.side)}
+              strokeOpacity={e.highlight ? 0.6 : 0.25} strokeWidth={e.highlight ? 2 : 1} />
+          ))}
+          {finalPill && (
+            <g>
+              <rect x={lastX + 6} y={lastY - 11} width={44} height={20} rx={4} fill={s.final >= 0 ? 'var(--team-us)' : 'var(--team-them)'} />
+              <text x={lastX + 28} y={lastY + 3} textAnchor="middle" fill="var(--bg-page)" fontSize={11} fontWeight={700}
+                fontFamily="var(--font-body)">{formatK(s.final)}</text>
+            </g>
+          )}
+        </svg>
+        {events.map((e, i) => (
+          <span key={i} className="ui-gold__at" style={{ left: `${(x(e.minute) / W) * 100}%`, top: `${(markY / H) * 100}%` }}>
+            <GoldMarker e={e} />
+          </span>
         ))}
-        {ticks.map((m) => (
-          <text key={m} x={x(m)} y={H - 12} textAnchor="middle" fill="var(--text-muted)" style={AXIS_FONT}>{m} min</text>
-        ))}
-        <path d={area} fill="var(--team-us)" fillOpacity={0.22} clipPath={`url(#${up})`} />
-        <path d={area} fill="var(--team-them)" fillOpacity={0.22} clipPath={`url(#${dn})`} />
-        <polyline points={pts} fill="none" stroke="var(--team-us)" strokeWidth={2.5} strokeLinejoin="round" clipPath={`url(#${up})`} />
-        <polyline points={pts} fill="none" stroke="var(--team-them)" strokeWidth={2.5} strokeLinejoin="round" clipPath={`url(#${dn})`} />
-        {events.map((e, i) => {
-          const v = values[Math.min(Math.max(Math.round(e.minute), 0), values.length - 1)] ?? 0;
-          return <GoldMarker key={i} e={e} cx={x(e.minute)} cy={y(v)} uid={uid} i={i} />;
-        })}
-      </svg>
+      </div>
     </figure>
   );
 }

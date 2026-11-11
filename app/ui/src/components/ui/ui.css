@@ -85,6 +85,7 @@
 .ui-proba { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
 .ui-proba__us { color: var(--team-us); }
 .ui-proba__them { color: var(--team-them); }
+.ui-proba__label { color: var(--text-muted); font-weight: 400; white-space: nowrap; }
 .ui-proba__bar { flex: 1; height: 6px; border-radius: 3px; background: var(--team-them); overflow: hidden; display: block; }
 .ui-proba__bar span { display: block; height: 100%; background: var(--team-us); }
 
@@ -164,6 +165,21 @@
 /* Graphiques */
 .ui-chart { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .ui-chart__caption { font-size: 13px; }
+.ui-chart__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 14px; }
+.ui-gold { position: relative; }
+.ui-gold__at { position: absolute; transform: translate(-50%, -50%); display: flex; }
+.ui-gold-mark { position: relative; display: flex; align-items: center; justify-content: center; }
+.ui-gold-mark__icons { position: relative; display: flex; }
+.ui-gold-mark__icons img {
+  display: block; border-radius: 50%; border: 2px solid; object-fit: cover; background: var(--bg-page); box-sizing: border-box;
+}
+.ui-gold-mark__empty { width: 14px; height: 14px; border-radius: 50%; border: 2px solid; background: var(--bg-card); }
+.ui-gold-mark__burst { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px; display: block; }
+.ui-gold-mark__badge {
+  position: absolute; white-space: nowrap; font-size: 10px; font-weight: 800; color: var(--bg-page); padding: 1px 5px;
+}
+.ui-gold-mark__badge--top { left: 50%; top: -14px; transform: translateX(-50%); border-radius: 4px; }
+.ui-gold-mark__badge--corner { right: -10px; top: -8px; border-radius: 8px; padding: 0 4px; }
 .ui-chart__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 11px; color: var(--text-muted); }
 .ui-radar { align-items: center; }
 .ui-legend { display: inline-block; width: 14px; }
