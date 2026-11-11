@@ -31,6 +31,10 @@ dev-web:
 seed:
     cargo run --release -p mm-data --features import --bin seed
 
+# Refait seulement les données de la draft (CSV d'Oracle's Elixir dans data/raw/oracles/).
+seed-draft:
+    cargo run --release -p mm-data --features import --bin seed -- --draft
+
 # Simule des matchs sans interface (arrive en M3/M4). Exemple : just sim KC G2 --n 1000
 sim *args:
     @echo "Simulation : arrive au jalon M3. Arguments reçus : {{args}}"
