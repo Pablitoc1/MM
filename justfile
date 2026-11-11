@@ -1,0 +1,44 @@
+# Toutes les commandes du projet. `just` seul liste les commandes.
+set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
+
+default:
+    @just --list
+
+# Formatage, lint et tous les tests. Doit être vert avant chaque PR.
+check: check-rust check-ui
+
+check-rust:
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace
+
+check-ui:
+    cd app && npm ci --silent
+    cd app && npm run typecheck
+    cd app && npm run lint
+    cd app && npm test
+
+# Lance l'application en mode développement (fenêtre Tauri).
+dev:
+    cd app && npm install --silent && npm run tauri dev
+
+# Lance seulement l'interface dans un navigateur (http://localhost:1420).
+dev-web:
+    cd app && npm install --silent && npm run dev
+
+# Télécharge les données et reconstruit la base de départ (arrive en M1).
+seed:
+    @echo "Import des données : arrive au jalon M1."
+
+# Simule des matchs sans interface (arrive en M3/M4). Exemple : just sim KC G2 --n 1000
+sim *args:
+    @echo "Simulation : arrive au jalon M3. Arguments reçus : {{args}}"
+
+# Prépare la démo de validation d'un jalon (captures dans docs/demo/<jalon>/).
+demo milestone:
+    cd app && npm run build
+    node tools/demo.mjs {{milestone}}
+
+# Fabrique l'installateur pour la machine courante.
+bundle:
+    cd app && npm ci --silent && npm run tauri build

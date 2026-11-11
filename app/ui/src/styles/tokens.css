@@ -1,0 +1,34 @@
+/* Couleurs et polices des maquettes v2. Toute l'interface lit ces variables. */
+:root {
+  --bg-page: #0f1420;
+  --bg-bar: #141b2a;
+  --bg-card: #182030;
+  --bg-active: #1f2a3f;
+  --border: #263248;
+  --border-strong: #3a4862;
+  --text: #e8ecf3;
+  --text-muted: #aeb8ca;
+
+  --team-us: #2ec4b6;   /* notre équipe (teal) */
+  --team-them: #f4a259; /* l'adversaire (orange) */
+  --accent-blue: #6c9bd2;
+  --accent-gold: #c8aa6e; /* icônes de rôle, étoiles */
+  --gold-value: #e2c46b;
+
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-title: 'Space Grotesk', 'Inter', sans-serif;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg-page);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: #5fd4c8; }
+button { font: inherit; }
+:focus-visible { outline: 2px solid var(--team-us); outline-offset: 2px; }
