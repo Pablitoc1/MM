@@ -26,9 +26,10 @@ dev:
 dev-web:
     cd app && npm install --silent && npm run dev
 
-# Télécharge les données et reconstruit la base de départ (arrive en M1).
+# Télécharge les vraies données et reconstruit data/seed/world.sqlite.
+# Les réponses sont gardées dans data/raw/ (supprime ce dossier pour tout retélécharger).
 seed:
-    @echo "Import des données : arrive au jalon M1."
+    cargo run --release -p mm-data --features import --bin seed
 
 # Simule des matchs sans interface (arrive en M3/M4). Exemple : just sim KC G2 --n 1000
 sim *args:

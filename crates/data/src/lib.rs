@@ -1,7 +1,15 @@
-//! Données du jeu : schéma SQLite, migrations et import des vraies données.
+//! Données du jeu : schéma SQLite, lecture de la base, et import des vraies données.
 //!
-//! Vide en M0. Le schéma et l'import arrivent en M1
-//! (Data Dragon, Leaguepedia, Oracle's Elixir).
+//! La base de départ (`data/seed/world.sqlite`) est fabriquée par `just seed`
+//! (feature `import`) puis livrée avec l'application, qui la lit en lecture seule.
 
-/// Version du schéma de la base. Augmente à chaque migration.
-pub const SCHEMA_VERSION: u32 = 0;
+pub mod read;
+pub mod schema;
+
+#[cfg(feature = "import")]
+pub mod import;
+
+pub use read::{Db, League, RosterMember, SeasonStats, Team};
+pub use schema::SCHEMA_VERSION;
+// Pour que l'application manipule les erreurs sans dépendre directement de rusqlite.
+pub use rusqlite;
