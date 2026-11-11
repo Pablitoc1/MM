@@ -3,7 +3,8 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-M3 · Carte et déplacements : lancé avec l'accord de Yahia dans le fil « Construire le moteur de match » (puis M4 et M5).
+M4 · Combat : lancé avec le « go M4 » de Yahia le 11 novembre 2026. M3 est fusionné (PR #15 à #17)
+et attend sa validation.
 Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novembre 2026 (PR #12 et #13).
 
 ## Ce qui marche
@@ -40,8 +41,13 @@ flux de la vue 2D (note 010). `just sim KC G2 --n 100` compare les CS, l'or et l
 demande ; navigateur : partie KC–G2 graine 1, `data/seed/public/match-demo.json`).
 Les attributs des notes M2 sont lus par le moteur (farm et mécanique en M3).
 
+## M4 · où on en est
+M4a : les sorts des 172 champions du patch 26.1, lus dans les fichiers du jeu (CommunityDragon,
+complété par Meraki), table `champion_kits`, `just seed-kits`, contrôle de chaque sort (note 011).
+Ensuite : le combat (M4b), puis les objets et le rapport sur 1 000 parties (M4c).
+
 ## Ce qui manque
-M3 en cours (voir plus haut), puis M4 · Combat et M5 · IA d'équipe.
+M4 en cours (voir plus haut), puis M5 · IA d'équipe.
 Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
 postes (Rekkles noté sur ses seules parties de support) ; les notes n'évoluent pas encore (M10).
 
