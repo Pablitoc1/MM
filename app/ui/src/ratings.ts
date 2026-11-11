@@ -28,7 +28,7 @@ export const ATTR_GROUPS: { title: string; keys: string[] }[] = [
 
 /** Demi-largeur (sur 20) au-delà de laquelle on montre une fourchette : même seuil que
  * `RANGE_SHOWN` dans crates/data/src/ratings.rs (environ un split et demi de parties). */
-export const RANGE_SHOWN = 1.5;
+export const RANGE_SHOWN = 1;
 
 /** Une fourchette s'affiche quand la note est estimée ou incertaine. `scale` : 20 ou 100. */
 export function isRange(a: { value?: number; low: number; high: number; estimated?: boolean }, scale = 20): boolean {
@@ -45,9 +45,9 @@ export function byKey(attrs: AttrScore[]): Map<string, AttrScore> {
   return new Map(attrs.map((a) => [a.key, a]));
 }
 
-/** Couleur d'une note sur 20 (échelle des maquettes). */
+/** Couleur d'une note sur 20 : 15 = joueur moyen de LEC, 17 et plus = très haut niveau. */
 export function tone(value: number): 'high' | 'mid' | 'low' {
-  if (value >= 15) return 'high';
-  if (value >= 10) return 'mid';
+  if (value >= 17) return 'high';
+  if (value >= 13) return 'mid';
   return 'low';
 }

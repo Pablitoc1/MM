@@ -116,7 +116,7 @@ function RatingNote({ p }: { p: PlayerDetail }) {
   }
   return (
     <p className="note">
-      Notes calculées sur {r.games} parties pro de 2014 à 2025 (les plus récentes comptent le plus), comparées aux joueurs du même poste dans la même ligue, puis ajustées au niveau de chaque ligue.
+      Niveau calculé sur {r.games} parties pro de 2014 à 2025 (les plus récentes comptent le plus) : la force réelle de ses équipes (Elo mondial), plus son apport face à ses coéquipiers. 75 = joueur moyen de LEC. Potentiel : progression observée des joueurs de son âge.
       Une fourchette signale une note incertaine ; « estimé » une qualité que les stats ne mesurent pas.
     </p>
   );

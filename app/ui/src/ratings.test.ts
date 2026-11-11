@@ -7,7 +7,7 @@ describe('notes', () => {
     expect(scoreText({ value: 13.5, low: 12.1, high: 15.2 })).toBe('12-15');
     expect(isRange({ value: 10, low: 10, high: 10, estimated: true })).toBe(true);
     // Niveau sur 100 : même seuil, mis à l'échelle.
-    expect(scoreText({ value: 82.3, low: 76, high: 88 }, 100)).toBe('82');
+    expect(scoreText({ value: 82.3, low: 78, high: 86 }, 100)).toBe('82');
     expect(scoreText({ value: 70, low: 60, high: 80 }, 100)).toBe('60-80');
   });
 
