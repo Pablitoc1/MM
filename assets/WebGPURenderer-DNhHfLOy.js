@@ -1,0 +1,1 @@
+export{n as WebGPURenderer}from"./renderer-BXJa8Hk3.js";
