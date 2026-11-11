@@ -3,8 +3,8 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-M1 · Base de données et import réel : PR ouverte, en attente de la validation de Yahia.
-M0 · Socle du projet validé le 11 novembre 2026.
+Aucun. M1 · Base de données et import réel validé par Yahia le 11 novembre 2026 (PR #4 et #5).
+Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
 
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
