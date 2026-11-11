@@ -11,3 +11,4 @@ workspace = true
 [dependencies]
 mm-engine = { path = "../engine" }
 mm-data = { path = "../data" }
+serde = { version = "1", features = ["derive"] }

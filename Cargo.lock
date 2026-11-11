@@ -2057,6 +2057,7 @@ version = "0.0.1"
 dependencies = [
  "mm-data",
  "mm-engine",
+ "serde",
 ]
 
 [[package]]

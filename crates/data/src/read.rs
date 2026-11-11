@@ -6,7 +6,7 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
 
 pub struct Db {
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
