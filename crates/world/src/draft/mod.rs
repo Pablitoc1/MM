@@ -6,6 +6,7 @@
 
 pub mod ai;
 pub mod knowledge;
+pub mod session;
 pub mod styles;
 
 use std::collections::BTreeSet;
@@ -15,6 +16,7 @@ use serde::Serialize;
 
 pub use ai::{auto_draft, choose, rank, Candidate, Reason};
 pub use knowledge::{ChampInfo, DraftPlayer, DraftTeam, Knowledge};
+pub use session::{Session, View};
 pub use styles::{analyse, CompAnalysis, Style};
 
 /// Poste d'un joueur : celui du moteur (même ordre, mêmes noms que la vue 2D).

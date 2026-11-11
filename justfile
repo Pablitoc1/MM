@@ -39,6 +39,10 @@ seed-draft:
 rapport-draft:
     cargo run --release -p mm-world --bin rapport-draft
 
+# Draft de démonstration KC – G2 pour l'écran Draft hors de Tauri (data/seed/public/draft-demo.json).
+draft-demo:
+    cargo run --release -p mm-world --bin draft-demo
+
 # Simule des parties sans interface et les compare à la LEC 2025.
 # Exemple : just sim KC G2 --n 100 --report docs/demo/M3/rapport-farm.md --replay partie.json
 sim *args:
