@@ -1904,6 +1904,7 @@ dependencies = [
 name = "mm-app"
 version = "0.0.1"
 dependencies = [
+ "mm-data",
  "mm-world",
  "serde",
  "tauri",
