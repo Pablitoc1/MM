@@ -4,6 +4,7 @@
 //! - Leaguepedia (lol.fandom.com, tables Cargo) : ligues, tournois, effectifs,
 //!   joueurs, contrats, stats pro 2025 ;
 //! - Liquipedia (liquipedia.net, API MediaWiki) : photos des joueurs et logos des clubs ;
+//! - Oracle's Elixir (Google Drive) : parties pro 2024 et 2025, pour les notes ;
 //! - Data Dragon (Riot) : champions, objets, sorts d'invocateur du patch de départ.
 //!
 //! Les réponses brutes sont gardées dans `data/raw/` : relancer l'import
@@ -13,6 +14,7 @@ pub mod ddragon;
 pub mod http;
 pub mod leaguepedia;
 pub mod liquipedia;
+pub mod oracles;
 
 use std::path::{Path, PathBuf};
 
@@ -35,6 +37,13 @@ pub struct LeagueConfig {
     pub id: String,
     pub name: String,
     pub tier: u8,
+    /// Codes de la ligue dans Oracle's Elixir, s'ils diffèrent de `id`
+    /// (ex. la LCS s'appelait « LTA N » en 2025).
+    #[serde(default)]
+    pub oe: Vec<String>,
+    /// Ligue académique : la ligue principale de la même région (ex. LCKCL → LCK).
+    #[serde(default)]
+    pub academy_of: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +81,9 @@ pub fn run(opts: &Options) -> Result<()> {
     eprintln!("Leaguepedia…");
     let summary = leaguepedia::import(&fetch, &tx, &leagues, &champs)?;
 
+    eprintln!("Oracle's Elixir (notes des joueurs)…");
+    let notes = oracles::import(&fetch, &opts.root.join("data/raw/oracles"), &tx, &leagues)?;
+
     eprintln!("Liquipedia (photos et logos)…");
     let slow = Fetcher::with_delay(
         opts.root.join("data/raw"),
@@ -87,7 +99,8 @@ pub fn run(opts: &Options) -> Result<()> {
         (
             "sources",
             "Leaguepedia (lol.fandom.com, CC BY-SA 3.0) ; photos et logos : Liquipedia \
-             (liquipedia.net, CC BY-SA 3.0) ; Data Dragon (Riot Games)"
+             (liquipedia.net, CC BY-SA 3.0) ; parties pro : Oracle's Elixir (oracleselixir.com) ; \
+             Data Dragon (Riot Games)"
                 .to_string(),
         ),
     ] {
@@ -105,6 +118,7 @@ pub fn run(opts: &Options) -> Result<()> {
     write_preview(&opts.out, &preview)?;
 
     eprintln!("{summary}, {images}");
+    eprintln!("{notes}");
     eprintln!("Base écrite : {}", opts.out.display());
     Ok(())
 }
@@ -116,9 +130,17 @@ pub fn write_preview(db_path: &Path, dest: &Path) -> Result<()> {
     let db = crate::Db::open_read_only(db_path)?;
     let mut teams = Vec::new();
     let mut rosters = serde_json::Map::new();
+    let mut players = serde_json::Map::new();
     for league in IMAGE_LEAGUES {
         for team in db.teams(league)? {
-            rosters.insert(team.id.clone(), serde_json::to_value(db.roster(&team.id)?)?);
+            let roster = db.roster(&team.id)?;
+            for m in &roster {
+                players.insert(
+                    m.person_id.clone(),
+                    serde_json::to_value(db.player(&m.person_id)?)?,
+                );
+            }
+            rosters.insert(team.id.clone(), serde_json::to_value(roster)?);
             teams.push(team);
         }
     }
@@ -126,6 +148,7 @@ pub fn write_preview(db_path: &Path, dest: &Path) -> Result<()> {
         "leagues": db.leagues()?,
         "teams": teams,
         "rosters": rosters,
+        "players": players,
     });
     std::fs::write(dest, serde_json::to_string(&json)?)?;
     Ok(())
