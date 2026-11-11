@@ -174,6 +174,15 @@ impl Db {
         )
     }
 
+    /// Données Data Dragon d'un champion (JSON complet : stats, sorts, passif).
+    pub fn champion_json(&self, id: &str) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row("SELECT data FROM champions WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
+    }
+
     pub fn top_champions(&self, person_id: &str, n: u32) -> rusqlite::Result<Vec<String>> {
         let mut st = self.conn.prepare(
             "SELECT champion FROM player_champions_2025
