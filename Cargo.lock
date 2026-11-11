@@ -2047,6 +2047,9 @@ dependencies = [
 [[package]]
 name = "mm-engine"
 version = "0.0.1"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "mm-world"
