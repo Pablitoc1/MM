@@ -78,6 +78,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Les 10 joueurs × les parties : instantanés à 10 et 15 minutes.
     let mut at10: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let mut at15: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
+    let mut at20: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
+    let mut at25: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
+    let mut end: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let (mut wards, mut recalls) = (vec![0.0; 5], vec![0.0; 5]);
     let start = std::time::Instant::now();
     for k in 0..a.n {
@@ -90,6 +93,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for (i, p) in r.players.iter().enumerate() {
             at10[i % 5].push(p.at10);
             at15[i % 5].push(p.at15);
+            at20[i % 5].push(p.at20);
+            at25[i % 5].push(p.at25);
+            end[i % 5].push(p.end);
             wards[i % 5] += f64::from(p.wards);
             recalls[i % 5] += f64::from(p.recalls);
         }
@@ -98,10 +104,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let same = simulate(&setup(a.seed)).players == simulate(&setup(a.seed)).players;
 
     let mut out = String::new();
-    writeln!(out, "# Rapport de calibrage : farm et combat (M4b)\n")?;
     writeln!(
         out,
-        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b) ; ni objets (M4c) ni plan d'équipe ni ganks (M5).",
+        "# Rapport de calibrage : farm, combat et objets (M4)\n"
+    )?;
+    writeln!(
+        out,
+        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b) et objets (M4c) ; ni plan d'équipe, ni ganks, ni objectifs (M5) : une partie ne peut pas encore se finir.",
         a.n,
         a.minutes,
         teams[0].tag,
@@ -140,7 +149,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &'a Vec<Vec<Snapshot>>,
         fn(&Snapshot) -> f64,
     );
-    let metrics: [Metric; 9] = [
+    let long = a.minutes >= 25.0;
+    let mut metrics: Vec<Metric> = vec![
         ("CS à 10 min", "csat10", &at10, |s| f64::from(s.cs)),
         ("Or à 10 min", "goldat10", &at10, |s| s.gold),
         ("XP à 10 min", "xpat10", &at10, |s| s.xp),
@@ -159,6 +169,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             f64::from(s.deaths)
         }),
     ];
+    if long {
+        metrics.extend::<[Metric; 6]>([
+            ("Or à 20 min", "goldat20", &at20, |s| s.gold),
+            ("Or à 25 min", "goldat25", &at25, |s| s.gold),
+            ("CS à 25 min", "csat25", &at25, |s| f64::from(s.cs)),
+            ("Kills à 25 min", "killsat25", &at25, |s| {
+                f64::from(s.kills)
+            }),
+            ("Morts à 25 min", "deathsat25", &at25, |s| {
+                f64::from(s.deaths)
+            }),
+            ("Objets terminés à 25 min", "", &at25, |s| {
+                f64::from(s.items)
+            }),
+        ]);
+    }
     for (title, key, data, get) in metrics {
         writeln!(out, "## {title}\n")?;
         writeln!(
@@ -173,21 +199,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 real[0].as_f64().unwrap_or(0.0),
                 real[1].as_f64().unwrap_or(0.0),
             );
-            let gap = if rm > 0.0 { (m - rm) / rm * 100.0 } else { 0.0 };
-            writeln!(
-                out,
-                "| {} | {m:.1} ± {sd:.1} | {rm:.1} ± {rsd:.1} | {gap:+.0} % |",
-                ROLE_FR[r]
-            )?;
+            if rm > 0.0 {
+                let gap = (m - rm) / rm * 100.0;
+                writeln!(
+                    out,
+                    "| {} | {m:.1} ± {sd:.1} | {rm:.1} ± {rsd:.1} | {gap:+.0} % |",
+                    ROLE_FR[r]
+                )?;
+            } else {
+                writeln!(out, "| {} | {m:.1} ± {sd:.1} | – | – |", ROLE_FR[r])?;
+            }
         }
         writeln!(out)?;
     }
     writeln!(out, "## Kills des deux équipes\n")?;
     writeln!(out, "| Moment | Simulé | LEC 2025 |\n|---|---|---|")?;
-    for (label, key, data) in [
+    let mut moments = vec![
         ("10 min", "kills_at10", &at10),
         ("15 min", "kills_at15", &at15),
-    ] {
+    ];
+    if long {
+        moments.push(("20 min", "kills_at20", &at20));
+        moments.push(("25 min", "kills_at25", &at25));
+    }
+    for (label, key, data) in moments {
         // Somme des kills des 10 joueurs de chaque partie (les joueurs sont rangés par partie).
         let games = data[0].len() / 2;
         let per_game: Vec<f64> = (0..games)
@@ -202,6 +237,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         writeln!(
             out,
             "| {label} | {m:.1} ± {sd:.1} | {:.1} ± {:.1} |",
+            real[0].as_f64().unwrap_or(0.0),
+            real[1].as_f64().unwrap_or(0.0)
+        )?;
+    }
+    // Kills par minute sur toute la partie simulée, contre la moyenne des vraies parties.
+    let games = end[0].len() / 2;
+    let total: Vec<f64> = (0..games)
+        .map(|g| {
+            (0..5)
+                .map(|r| f64::from(end[r][2 * g].kills + end[r][2 * g + 1].kills))
+                .sum::<f64>()
+                / a.minutes
+        })
+        .collect();
+    let (m, sd) = mean_sd(&total);
+    let real = &reference["kills_per_min"];
+    writeln!(
+        out,
+        "| Par minute ({} min) | {m:.2} ± {sd:.2} | {:.2} ± {:.2} |",
+        a.minutes,
+        real[0].as_f64().unwrap_or(0.0),
+        real[1].as_f64().unwrap_or(0.0)
+    )?;
+    writeln!(out)?;
+    writeln!(out, "## Or d'une équipe\n")?;
+    writeln!(out, "| Moment | Simulé | LEC 2025 |\n|---|---|---|")?;
+    let mut moments = vec![("15 min", "team_gold_at15", &at15)];
+    if long {
+        moments.push(("25 min", "team_gold_at25", &at25));
+    }
+    for (label, key, data) in moments {
+        let per_team: Vec<f64> = (0..data[0].len())
+            .map(|k| (0..5).map(|r| data[r][k].gold).sum())
+            .collect();
+        let (m, sd) = mean_sd(&per_team);
+        let real = &reference[key];
+        writeln!(
+            out,
+            "| {label} | {m:.0} ± {sd:.0} | {:.0} ± {:.0} |",
             real[0].as_f64().unwrap_or(0.0),
             real[1].as_f64().unwrap_or(0.0)
         )?;

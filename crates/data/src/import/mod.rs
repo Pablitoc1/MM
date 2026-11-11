@@ -83,6 +83,7 @@ pub fn run(opts: &Options) -> Result<()> {
 
     eprintln!("CommunityDragon {} (sorts)…", cdragon::CDRAGON_VERSION);
     let kits = cdragon::import(&fetch, &tx, &champion_ids(&tx)?)?;
+    let items = cdragon::import_items(&fetch, &tx)?;
 
     eprintln!("Leaguepedia…");
     let summary = leaguepedia::import(&fetch, &tx, &leagues, &champs)?;
@@ -129,7 +130,7 @@ pub fn run(opts: &Options) -> Result<()> {
     write_preview(&opts.out, &preview)?;
 
     eprintln!("{summary}, {images}");
-    eprintln!("{kits}");
+    eprintln!("{kits}, {items}");
     eprintln!("{notes}");
     eprintln!("{draft}");
     eprintln!("Base écrite : {}", opts.out.display());
@@ -169,9 +170,10 @@ pub fn run_kits_only(opts: &Options) -> Result<()> {
     let fetch = Fetcher::new(opts.root.join("data/raw"));
     let mut conn = Connection::open(&opts.out)?;
     let tx = conn.transaction()?;
-    tx.execute_batch("DROP TABLE IF EXISTS champion_kits")?;
+    tx.execute_batch("DROP TABLE IF EXISTS champion_kits; DROP TABLE IF EXISTS item_stats")?;
     tx.execute_batch(schema::KITS)?;
     let kits = cdragon::import(&fetch, &tx, &champion_ids(&tx)?)?;
+    let items = cdragon::import_items(&fetch, &tx)?;
     tx.pragma_update(None, "user_version", schema::SCHEMA_VERSION)?;
     for (k, v) in [
         ("schema_version", schema::SCHEMA_VERSION.to_string()),
@@ -184,7 +186,7 @@ pub fn run_kits_only(opts: &Options) -> Result<()> {
     }
     tx.commit()?;
     conn.execute_batch("VACUUM")?;
-    eprintln!("{kits}");
+    eprintln!("{kits}, {items}");
     Ok(())
 }
 

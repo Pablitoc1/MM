@@ -139,7 +139,7 @@ export async function listTeams(leagueId: string): Promise<Team[]> {
 }
 
 /**
- * Une partie simulée par le moteur (M3 : 15 min de farm, sans combat).
+ * Une partie simulée par le moteur (M4 : 15 min de farm, de combats en voie et d'achats).
  * Dans l'app : simulée à la demande. Dans le navigateur : la partie KC–G2 graine 3,
  * produite par le même moteur (`just sim KC G2 --n 1 --replay data/seed/public/match-demo.json`).
  */

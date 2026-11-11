@@ -7,6 +7,7 @@ mod combat;
 use combat::{Fighter, Mode};
 
 use crate::geo::{Lane, Point, Side, BLUE, RED};
+use crate::item::{Inventory, Item};
 use crate::kit::Kit;
 use crate::map::{self, Camp, CampKind, Nav, StructureKind};
 use crate::player::{Attr, Attributes, ChampionStats};
@@ -27,6 +28,8 @@ pub struct PlayerSetup {
     pub spells: [String; 2],
     /// Sorts du champion (note 011). Sans eux, il ne se bat qu'avec ses attaques.
     pub kit: Option<Kit>,
+    /// Objets à acheter, dans l'ordre (note 014). Vide : il ne s'équipe pas.
+    pub build: Vec<Item>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,12 +58,16 @@ pub struct Snapshot {
     pub level: u32,
     pub kills: u32,
     pub deaths: u32,
+    /// Objets terminés.
+    pub items: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlayerReport {
     pub at10: Snapshot,
     pub at15: Snapshot,
+    pub at20: Snapshot,
+    pub at25: Snapshot,
     pub end: Snapshot,
     /// Secondes passées dans la vision de l'adversaire.
     pub seen: f64,
@@ -118,6 +125,9 @@ struct Champ {
     xp: f64,
     gold: f64,
     gold_since_recall: f64,
+    /// Or pas encore dépensé.
+    purse: f64,
+    inv: Inventory,
     cs: u32,
     /// Attaques disponibles (la vitesse d'attaque les recharge).
     charge: f64,
@@ -133,18 +143,30 @@ impl Champ {
         rules::level_for_xp(self.xp)
     }
 
-    fn ad(&self) -> f64 {
+    /// Dégâts d'attaque du champion seul (sans objets).
+    fn base_ad(&self) -> f64 {
         rules::stat_at_level(self.stats.ad, self.stats.ad_per_level, self.level())
+    }
+
+    fn ad(&self) -> f64 {
+        self.base_ad() + self.inv.stats.attack_damage
     }
 
     fn attack_speed(&self) -> f64 {
         let bonus = rules::stat_at_level(0.0, self.stats.attack_speed_per_level, self.level());
-        self.stats.attack_speed * (1.0 + bonus / 100.0)
+        // Plafond du jeu : 2,5 attaques par seconde.
+        (self.stats.attack_speed * (1.0 + bonus / 100.0 + self.inv.stats.attack_speed)).min(2.5)
     }
 
     fn earn(&mut self, gold: f64) {
         self.gold += gold;
         self.gold_since_recall += gold;
+        self.purse += gold;
+    }
+
+    /// Passage à la boutique (à la fontaine) : l'or va dans les objets du build.
+    fn shop(&mut self) {
+        self.purse = self.inv.shop(self.purse);
     }
 
     fn snapshot(&self) -> Snapshot {
@@ -155,6 +177,7 @@ impl Champ {
             level: self.level(),
             kills: self.report.kills,
             deaths: self.report.deaths,
+            items: self.inv.done as u32,
         }
     }
 
@@ -252,6 +275,12 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
             if g.t == 900.0 {
                 c.report.at15 = c.snapshot();
             }
+            if g.t == 1200.0 {
+                c.report.at20 = c.snapshot();
+            }
+            if g.t == 1500.0 {
+                c.report.at25 = c.snapshot();
+            }
         }
         frames.push(g.frame());
         if winner.is_some() {
@@ -322,6 +351,8 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
                 xp: 0.0,
                 gold: rules::STARTING_GOLD,
                 gold_since_recall: 0.0,
+                purse: rules::STARTING_GOLD,
+                inv: Inventory::new(p.build.clone()),
                 cs: 0,
                 charge: 0.0,
                 recall_until: None,
@@ -336,6 +367,7 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
         }
     }
     for c in &mut champs {
+        c.shop();
         c.level_up();
         c.fighter.hp = c.max_hp();
         c.fighter.mana = c.max_mana();
@@ -478,6 +510,7 @@ impl Game {
                 c.path.clear();
                 c.recall_until = None;
                 c.fighter.mode = Mode::Idle;
+                c.shop();
                 // La fontaine soigne en quelques secondes : on repart plein.
                 c.fighter.hp = c.max_hp();
                 c.fighter.mana = c.max_mana();
@@ -730,7 +763,7 @@ impl Game {
                     level: c.level(),
                     cs: c.cs,
                     gold: c.gold.round(),
-                    items: Vec::new(),
+                    items: c.inv.ids(),
                 })
                 .collect(),
             waves: self
@@ -793,6 +826,7 @@ mod tests {
                     attrs: Attributes::default(),
                     spells: ["SummonerFlash".into(), "SummonerTeleport".into()],
                     kit: None,
+                    build: Vec::new(),
                 })
                 .collect(),
         }

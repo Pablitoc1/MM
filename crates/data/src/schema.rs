@@ -4,7 +4,7 @@
 use rusqlite::Connection;
 
 /// Version du schéma de la base. Augmente à chaque migration.
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 const V1: &str = r#"
 CREATE TABLE meta (
@@ -206,11 +206,17 @@ CREATE TABLE pro_drafts (
 CREATE INDEX pro_drafts_teams ON pro_drafts (blue_team, red_team);
 "#;
 
-/// Sorts des champions (note 011) : JSON au format `mm_engine::kit::Kit`.
+/// Sorts des champions (note 011, JSON `mm_engine::kit::Kit`) et stats des objets (note 014).
 pub const KITS: &str = r#"
 CREATE TABLE champion_kits (
     champion TEXT PRIMARY KEY,        -- clé Data Dragon
     data     TEXT NOT NULL
+);
+
+-- Stats des objets de la Faille (note 014) : JSON au format `mm_engine::item::Item`.
+CREATE TABLE item_stats (
+    id   INTEGER PRIMARY KEY,
+    data TEXT NOT NULL
 );
 "#;
 

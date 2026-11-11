@@ -54,6 +54,72 @@ pub fn import(fetch: &Fetcher, tx: &Transaction, champions: &[String]) -> Result
     ))
 }
 
+const ITEMS: &str = "game/items.cdtb.bin.json";
+
+/// Stats des objets de la Faille de l'invocateur (carte 11 de Data Dragon), lues dans le fichier
+/// des objets du patch. Prix total et nom français : Data Dragon (table `items`).
+pub fn import_items(fetch: &Fetcher, tx: &Transaction) -> Result<String> {
+    let bin = fetch.get_json(&format!("{CDRAGON}/{CDRAGON_VERSION}/{ITEMS}"))?;
+    let rows: Vec<(u32, String, f64, String)> = {
+        let mut st = tx.prepare("SELECT id, name, gold, data FROM items")?;
+        let rows = st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        rows
+    };
+    let mut stmt = tx.prepare("INSERT INTO item_stats (id, data) VALUES (?1, ?2)")?;
+    let mut n = 0;
+    for (id, name, gold, data) in rows {
+        let dd: Value = serde_json::from_str(&data)?;
+        if dd["maps"]["11"] != Value::Bool(true) || gold <= 0.0 {
+            continue;
+        }
+        let Some(v) = bin.get(format!("Items/{id}")) else {
+            continue;
+        };
+        let item = mm_engine::item::Item {
+            id,
+            name,
+            gold,
+            stats: item_stats(v),
+        };
+        stmt.execute(params![id, serde_json::to_string(&item)?])?;
+        n += 1;
+    }
+    Ok(format!("{n} objets"))
+}
+
+fn item_stats(v: &Value) -> mm_engine::item::ItemStats {
+    // Les fichiers stockent des f32 : on arrondit (0.30000001 → 0.3).
+    let f = |k: &str| (v[k].as_f64().unwrap_or(0.0) * 1e4).round() / 1e4;
+    mm_engine::item::ItemStats {
+        attack_damage: f("mFlatPhysicalDamageMod"),
+        ability_power: f("mFlatMagicDamageMod"),
+        health: f("mFlatHPPoolMod"),
+        mana: f("flatMPPoolMod") + f("mFlatMPPoolMod"),
+        armor: f("mFlatArmorMod"),
+        magic_resist: f("mFlatSpellBlockMod"),
+        attack_speed: f("mPercentAttackSpeedMod"),
+        crit_chance: f("mFlatCritChanceMod"),
+        crit_damage: f("mFlatCritDamageMod"),
+        ability_haste: f("mAbilityHasteMod"),
+        move_speed: f("mFlatMovementSpeedMod"),
+        move_speed_pct: f("mPercentMovementSpeedMod"),
+        armor_pen_pct: f("mPercentArmorPenetrationMod"),
+        // La létalité n'est pas une stat du fichier : c'est une valeur nommée de l'objet.
+        lethality: v["mDataValues"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|d| d["mName"] == "LethalityAmount" || d["mName"] == "Lethality")
+            .and_then(|d| d["mValue"].as_f64())
+            .unwrap_or(0.0),
+        magic_pen: f("mFlatMagicPenetrationMod"),
+        magic_pen_pct: f("mPercentMagicPenetrationMod"),
+        life_steal: f("mPercentLifeStealMod"),
+    }
+}
+
 /// Les quatre sorts d'un champion à partir de son fichier `<champion>.bin.json`.
 pub fn kit_from_bin(id: &str, bin: &Value, meraki: Option<&Value>) -> Option<Kit> {
     let root = bin

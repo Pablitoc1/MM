@@ -120,19 +120,28 @@ impl Champ {
         self.fighter.dead_until.is_none()
     }
 
-    pub(super) fn max_hp(&self) -> f64 {
+    fn base_hp(&self) -> f64 {
         rules::stat_at_level(self.stats.hp, self.stats.hp_per_level, self.level())
+    }
+
+    pub(super) fn max_hp(&self) -> f64 {
+        self.base_hp() + self.inv.stats.health
     }
 
     pub(super) fn max_mana(&self) -> f64 {
         rules::stat_at_level(self.stats.mp, self.stats.mp_per_level, self.level())
+            + self.inv.stats.mana
     }
 
-    fn armor(&self) -> f64 {
+    fn base_armor(&self) -> f64 {
         rules::stat_at_level(self.stats.armor, self.stats.armor_per_level, self.level())
     }
 
-    fn magic_resist(&self) -> f64 {
+    fn armor(&self) -> f64 {
+        self.base_armor() + self.inv.stats.armor
+    }
+
+    fn base_magic_resist(&self) -> f64 {
         rules::stat_at_level(
             self.stats.magic_resist,
             self.stats.magic_resist_per_level,
@@ -140,22 +149,36 @@ impl Champ {
         )
     }
 
+    fn magic_resist(&self) -> f64 {
+        self.base_magic_resist() + self.inv.stats.magic_resist
+    }
+
+    /// Multiplicateur moyen d'une attaque avec les critiques : 175 % de base, plus les bonus.
+    pub(super) fn crit_factor(&self) -> f64 {
+        let s = &self.inv.stats;
+        1.0 + s.crit_chance.min(1.0) * (0.75 + s.crit_damage)
+    }
+
+    /// Recharge réduite par l'accélération de compétence : × 100 / (100 + AC).
+    fn haste_factor(&self) -> f64 {
+        100.0 / (100.0 + self.inv.stats.ability_haste)
+    }
+
     pub(super) fn stat_block(&self) -> StatBlock {
-        let ad = self.ad();
         StatBlock {
-            ability_power: 0.0,
-            attack_damage: ad,
-            base_attack_damage: ad,
+            ability_power: self.inv.stats.ability_power,
+            attack_damage: self.ad(),
+            base_attack_damage: self.base_ad(),
             armor: self.armor(),
-            base_armor: self.armor(),
+            base_armor: self.base_armor(),
             magic_resist: self.magic_resist(),
-            base_magic_resist: self.magic_resist(),
+            base_magic_resist: self.base_magic_resist(),
             health: self.max_hp(),
-            base_health: self.max_hp(),
+            base_health: self.base_hp(),
             attack_speed: self.attack_speed(),
-            move_speed: self.stats.move_speed,
-            crit_chance: 0.0,
-            lethality: 0.0,
+            move_speed: self.speed(0.0),
+            crit_chance: self.inv.stats.crit_chance.min(1.0),
+            lethality: self.inv.stats.lethality,
             mana: self.max_mana(),
         }
     }
@@ -166,7 +189,8 @@ impl Champ {
         } else {
             0.0
         };
-        self.stats.move_speed * (1.0 - slow)
+        let s = &self.inv.stats;
+        (self.stats.move_speed + s.move_speed) * (1.0 + s.move_speed_pct) * (1.0 - slow)
     }
 
     /// Monte les rangs des sorts jusqu'au niveau atteint.
@@ -191,7 +215,7 @@ impl Champ {
     fn threat(&self, t: f64) -> f64 {
         let stats = self.stat_block();
         let level = self.level();
-        let mut dmg = self.ad() * self.attack_speed() * 3.0;
+        let mut dmg = self.ad() * self.crit_factor() * self.attack_speed() * 3.0;
         if let Some(kit) = &self.fighter.kit {
             for (s, spell) in kit.spells.iter().enumerate() {
                 let rank = self.fighter.ranks[s];
@@ -410,8 +434,13 @@ impl Game {
         if dist <= reach {
             if self.champs[i].charge >= 1.0 {
                 self.champs[i].charge -= 1.0;
-                let raw = self.champs[i].ad();
-                self.hit(i, target, raw, DamageType::Physical, t);
+                let c = &self.champs[i];
+                let raw = c.ad() * c.crit_factor();
+                let dealt = self.hit(i, target, raw, DamageType::Physical, t);
+                // Vol de vie sur les attaques.
+                let c = &mut self.champs[i];
+                let heal = dealt * c.inv.stats.life_steal;
+                c.fighter.hp = (c.fighter.hp + heal).min(c.max_hp());
             }
         } else {
             let to = self.champs[target].pos;
@@ -498,7 +527,7 @@ impl Game {
         let c = &mut self.champs[i];
         let rank = c.fighter.ranks[s];
         c.fighter.mana -= spell.cost_at(rank);
-        let cd = spell.cooldown_at(rank);
+        let cd = spell.cooldown_at(rank) * c.haste_factor();
         c.fighter.ready_at[s] = t + if cd < 2.0 { MIN_COOLDOWN } else { cd };
         c.fighter.busy_until = t + spell.cast_time.min(1.0);
         let stats = c.stat_block();
@@ -584,12 +613,28 @@ impl Game {
         }
     }
 
-    /// Dégâts de `i` sur `j`, après résistances et bouclier.
-    fn hit(&mut self, i: usize, j: usize, raw: f64, kind: DamageType, t: f64) {
+    /// Dégâts de `i` sur `j`, après résistances (moins la pénétration) et bouclier. Renvoie les
+    /// dégâts infligés.
+    fn hit(&mut self, i: usize, j: usize, raw: f64, kind: DamageType, t: f64) -> f64 {
         let target = &self.champs[j];
+        let pen = &self.champs[i].inv.stats;
+        // Ordre du jeu : pénétration en % puis fixe ; elle ne fait pas passer sous zéro.
+        let resist = |r: f64, pct: f64, flat: f64| {
+            if r <= 0.0 {
+                r
+            } else {
+                (r * (1.0 - pct) - flat).max(0.0)
+            }
+        };
         let dmg = match kind {
-            DamageType::Physical => mitigate(raw, target.armor()),
-            DamageType::Magic => mitigate(raw, target.magic_resist()),
+            DamageType::Physical => mitigate(
+                raw,
+                resist(target.armor(), pen.armor_pen_pct, pen.lethality),
+            ),
+            DamageType::Magic => mitigate(
+                raw,
+                resist(target.magic_resist(), pen.magic_pen_pct, pen.magic_pen),
+            ),
             DamageType::True => raw,
         };
         self.champs[i].fighter.aggro_until = t + 2.0;
@@ -614,6 +659,7 @@ impl Game {
         if f.hp <= 0.0 {
             self.death(j, Some(i), t);
         }
+        dmg
     }
 
     /// Les tours tirent sur un champion ennemi qui vient de frapper un champion à leur portée.
@@ -722,6 +768,7 @@ impl Game {
         for c in &mut self.champs {
             if c.fighter.dead_until.is_some_and(|u| t >= u) {
                 c.fighter.dead_until = None;
+                c.shop();
                 c.fighter.hp = c.max_hp();
                 c.fighter.mana = c.max_mana();
                 c.fighter.slow_until = 0.0;
@@ -822,6 +869,153 @@ mod tests {
             };
         }
         g
+    }
+
+    fn item(stats: crate::item::ItemStats) -> crate::item::Item {
+        crate::item::Item {
+            id: 1,
+            name: "Test".into(),
+            gold: 1000.0,
+            stats,
+        }
+    }
+
+    /// Chaque stat d'objet arrive dans le calcul qui l'utilise.
+    #[test]
+    fn chaque_stat_d_objet_compte() {
+        use crate::item::{Inventory, ItemStats};
+        let base = duel();
+        let equip = |stats: ItemStats| {
+            let mut g = duel();
+            g.champs[0].inv = Inventory::new(vec![item(stats)]);
+            g.champs[0].purse = 1000.0;
+            g.champs[0].shop();
+            g
+        };
+        let (c0, b0) = (|g: &Game| -> f64 { g.champs[0].ad() }, base.champs[0].ad());
+        assert_eq!(
+            c0(&equip(ItemStats {
+                attack_damage: 50.0,
+                ..Default::default()
+            })),
+            b0 + 50.0
+        );
+        let g = equip(ItemStats {
+            health: 400.0,
+            armor: 30.0,
+            magic_resist: 20.0,
+            mana: 300.0,
+            ..Default::default()
+        });
+        let (c, b) = (&g.champs[0], &base.champs[0]);
+        assert_eq!(c.max_hp(), b.max_hp() + 400.0);
+        assert_eq!(c.armor(), b.armor() + 30.0);
+        assert_eq!(c.magic_resist(), b.magic_resist() + 20.0);
+        assert_eq!(c.max_mana(), b.max_mana() + 300.0);
+        // Les stats « de base » des sorts n'incluent pas les objets.
+        assert_eq!(c.stat_block().base_health, b.max_hp());
+        let g = equip(ItemStats {
+            ability_power: 80.0,
+            ..Default::default()
+        });
+        assert_eq!(g.champs[0].stat_block().ability_power, 80.0);
+        let g = equip(ItemStats {
+            attack_speed: 0.4,
+            ..Default::default()
+        });
+        assert!(g.champs[0].attack_speed() > base.champs[0].attack_speed() * 1.3);
+        let g = equip(ItemStats {
+            move_speed: 45.0,
+            move_speed_pct: 0.04,
+            ..Default::default()
+        });
+        let expected = (base.champs[0].speed(0.0) + 45.0) * 1.04;
+        assert!((g.champs[0].speed(0.0) - expected).abs() < 1e-9);
+        // Critiques : 25 % de chances à 175 % (+30 %) = ×1,2625 en moyenne.
+        let g = equip(ItemStats {
+            crit_chance: 0.25,
+            crit_damage: 0.3,
+            ..Default::default()
+        });
+        assert!((g.champs[0].crit_factor() - 1.2625).abs() < 1e-9);
+        // Accélération : 20 AC raccourcit la recharge de 1/6.
+        let mut g = equip(ItemStats {
+            ability_haste: 20.0,
+            ..Default::default()
+        });
+        g.cast(0, 0, 5, 300.0);
+        assert!((g.champs[0].fighter.ready_at[0] - (300.0 + 6.0 * 100.0 / 120.0)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn la_penetration_et_le_vol_de_vie() {
+        use crate::item::{Inventory, ItemStats};
+        let dealt = |stats: ItemStats, kind: DamageType| {
+            let mut g = duel();
+            g.champs[0].inv = Inventory::new(vec![item(stats)]);
+            g.champs[0].purse = 1000.0;
+            g.champs[0].shop();
+            g.hit(0, 5, 100.0, kind, 300.0)
+        };
+        let none = dealt(ItemStats::default(), DamageType::Physical);
+        let pen = dealt(
+            ItemStats {
+                armor_pen_pct: 0.35,
+                lethality: 10.0,
+                ..Default::default()
+            },
+            DamageType::Physical,
+        );
+        let g = duel();
+        let armor = g.champs[5].armor();
+        assert!((none - mitigate(100.0, armor)).abs() < 1e-9);
+        assert!((pen - mitigate(100.0, armor * 0.65 - 10.0)).abs() < 1e-9);
+        let mr = g.champs[5].magic_resist();
+        let magic = dealt(
+            ItemStats {
+                magic_pen_pct: 0.4,
+                magic_pen: 15.0,
+                ..Default::default()
+            },
+            DamageType::Magic,
+        );
+        assert!((magic - mitigate(100.0, (mr * 0.6 - 15.0).max(0.0))).abs() < 1e-9);
+
+        // Vol de vie : 15 % des dégâts des attaques reviennent en PV.
+        let mut g = duel();
+        g.champs[0].inv = Inventory::new(vec![item(ItemStats {
+            life_steal: 0.15,
+            ..Default::default()
+        })]);
+        g.champs[0].purse = 1000.0;
+        g.champs[0].shop();
+        g.champs[0].fighter.hp = 100.0;
+        g.champs[0].charge = 1.0;
+        g.champs[0].pos = g.champs[5].pos;
+        g.champs[0].fighter.kit = None;
+        g.champs[0].fighter.mode = Mode::Fight { target: 5 };
+        g.act(0, 300.0);
+        let dealt = g.champs[0].report.damage;
+        assert!(dealt > 0.0);
+        assert!((g.champs[0].fighter.hp - (100.0 + 0.15 * dealt)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn la_boutique_au_retour_a_la_base() {
+        use crate::item::{Inventory, ItemStats};
+        let mut g = duel();
+        let base = g.champs[0].ad();
+        g.champs[0].inv = Inventory::new(vec![item(ItemStats {
+            attack_damage: 40.0,
+            ..Default::default()
+        })]);
+        g.champs[0].purse = 0.0;
+        g.champs[0].earn(1000.0);
+        assert_eq!(g.champs[0].ad(), base);
+        g.champs[0].recall_until = Some(g.t);
+        g.think(0, 1.0);
+        assert_eq!(g.champs[0].ad(), base + 40.0);
+        assert_eq!(g.champs[0].purse, 0.0);
     }
 
     #[test]
