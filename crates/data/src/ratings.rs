@@ -80,6 +80,11 @@ pub struct GameLine {
     pub first_blood: Option<bool>,
     /// Écart d'or de l'équipe à 15 min.
     pub team_gold_diff_15: Option<f64>,
+    /// Force de son équipe avant la partie (Elo mondial), en écarts-types de niveau
+    /// par rapport à une équipe moyenne de la LEC.
+    pub team_strength: Option<f64>,
+    /// Identifiant de l'équipe dans cette partie (mêmes coéquipiers = même valeur).
+    pub team_game: u64,
 }
 
 /// Les attributs, dans l'ordre de la fiche joueur (maquette v2).
@@ -178,15 +183,35 @@ pub struct Params {
     pub default_offset: f64,
 }
 
-/// Échelle /20 : moyenne de la LEC à 10,5, un écart-type vaut 3 points.
-const MID_20: f64 = 10.5;
-const SD_20: f64 = 3.0;
-/// Échelle /100 du niveau.
-const MID_100: f64 = 60.0;
+/// Échelle /100 du niveau : une équipe moyenne de LEC à 75, un écart-type vaut 10
+/// points ; le meilleur joueur du monde est vers 95.
+const MID_100: f64 = 75.0;
 const SD_100: f64 = 10.0;
+/// Échelle /20 des attributs : la même, divisée par 5 (15/20 = 75/100).
+const SD_20: f64 = SD_100 / 5.0;
+
+/// Au-delà d'un écart-type, des stats hors normes disent surtout un style de jeu
+/// (un ancien ADC au support, un mid qui joue pour son équipe) : l'apport
+/// individuel est resserré en douceur vers ± cette limite. // estimé
+const INDIVIDUAL_LIMIT: f64 = 1.0;
+
+/// Resserrement doux : linéaire près de 0, jamais au-delà de ± `limit`.
+fn soft(z: f64, limit: f64) -> f64 {
+    limit * (z / limit).tanh()
+}
+
+/// Part de la moyenne des coéquipiers retirée de chaque stat : 1 = on compare le
+/// joueur à ses coéquipiers seulement. // estimé : 0,8 garde un peu de l'effet
+/// « bon joueur dans une bonne équipe », que l'Elo ne voit qu'à moitié.
+const TEAMMATE_SHARE: f64 = 0.8;
+
+/// Part de l'apport individuel (stats face aux joueurs de sa ligue) à côté de la
+/// force de l'équipe : les stats d'un joueur viennent aussi de son équipe, on n'en
+/// garde que 70 % pour ne pas compter l'équipe deux fois. // estimé
+const W_INDIVIDUAL: f64 = 0.7;
 /// En dessous de cette demi-largeur (sur 20), la note est affichée seule, sans fourchette :
 /// environ 36 parties pondérées, soit un split et demi. Le front applique le même seuil.
-pub const RANGE_SHOWN: f64 = 1.5;
+pub const RANGE_SHOWN: f64 = 1.0;
 
 /// Statistiques par minute ou par partie, pour un joueur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -366,6 +391,8 @@ struct Profile {
     weight: f64,
     /// Niveau moyen des ligues où il a joué, pondéré comme ses parties.
     offset: f64,
+    /// Force moyenne de ses équipes (Elo mondial), pondérée comme ses parties.
+    base: f64,
     /// Chaque métrique, en écarts-types par rapport aux joueurs de sa ligue et de l'année.
     metrics: BTreeMap<Metric, f64>,
     /// Score de chaque partie (régularité, grands matchs, sang-froid), poids de carrière.
@@ -529,6 +556,26 @@ pub fn seasons(lines: &[GameLine], min_games: u32) -> Vec<Season> {
 /// Calcule les notes de tous les joueurs (clé = identifiant du joueur dans `lines`).
 pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRating> {
     let std = Standardizer::new(lines);
+    // Moyenne de chaque métrique standardisée par équipe et par partie : on compare
+    // ensuite chaque joueur à ses coéquipiers (la force de l'équipe est mesurée à
+    // part, par son Elo), pour qu'une super-équipe ne gonfle pas tous ses joueurs.
+    let mut team_sum: HashMap<(u64, Metric), (f64, u32)> = HashMap::new();
+    for g in lines {
+        for m in METRICS {
+            if let Some(z) = std.z(g, m) {
+                let e = team_sum.entry((g.team_game, m)).or_default();
+                e.0 += z;
+                e.1 += 1;
+            }
+        }
+    }
+    let vs_teammates = |g: &GameLine, m: Metric| -> Option<f64> {
+        let z = std.z(g, m)?;
+        match team_sum.get(&(g.team_game, m)) {
+            Some((sum, n)) if *n >= 2 => Some(z - TEAMMATE_SHARE * (sum - z) / (*n - 1) as f64),
+            _ => Some(z),
+        }
+    };
     let offset_of = |league: &str| {
         params
             .league_offset
@@ -563,12 +610,18 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             .map(|g| offset_of(&g.league) * (params.year_weight)(g.year))
             .sum::<f64>()
             / weight;
+        // Force de ses équipes (Elo mondial) ; à défaut, le niveau de la ligue.
+        let base = games
+            .iter()
+            .map(|g| g.team_strength.unwrap_or(offset_of(&g.league)) * (params.year_weight)(g.year))
+            .sum::<f64>()
+            / weight;
 
         let mut metrics = BTreeMap::new();
         for m in METRICS {
             let vals: Vec<(f64, f64)> = games
                 .iter()
-                .filter_map(|g| std.z(g, m).map(|v| (v, (params.year_weight)(g.year))))
+                .filter_map(|g| vs_teammates(g, m).map(|v| (v, (params.year_weight)(g.year))))
                 .collect();
             let w: f64 = vals.iter().map(|v| v.1).sum();
             if w > 0.0 {
@@ -589,6 +642,7 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
                 games: games.len() as u32,
                 weight,
                 offset,
+                base,
                 metrics,
                 game_scores: games
                     .iter()
@@ -715,12 +769,13 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
     for (k, p) in &profiles {
         let off = p.offset;
         let shrink = p.weight / (p.weight + params.prior_games);
+        let individual = |z: f64| W_INDIVIDUAL * soft(z, INDIVIDUAL_LIMIT) * shrink * transfer(off);
         let half = SD_20 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
         let mut attrs = BTreeMap::new();
         for a in Attr::ALL {
             let score = match measured(a, k, p) {
                 Some(zr) => {
-                    let z = off + zr * shrink * transfer(off);
+                    let z = p.base + individual(zr);
                     let value = to20(z);
                     Score {
                         value,
@@ -729,15 +784,15 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
                         estimated: false,
                     }
                 }
-                None => estimated(a, p, off),
+                None => estimated(a, p, p.base),
             };
             attrs.insert(a, score);
         }
         let z = match composite(k, p) {
-            Some(c) => off + c * shrink * transfer(off),
-            None => off,
+            Some(c) => p.base + individual(c),
+            None => p.base,
         };
-        let level = (MID_100 + SD_100 * z).clamp(25.0, 99.0);
+        let level = to100(z);
         let half100 = SD_100 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
         out.insert(
             k.to_string(),
@@ -766,8 +821,20 @@ fn transfer(offset: f64) -> f64 {
     (1.0 + 0.25 * offset.min(0.0)).max(0.5)
 }
 
+/// Niveau sur 100 : linéaire jusqu'à 85, puis resserré vers 99 (seuls les
+/// meilleurs joueurs du monde approchent 95).
+fn to100(z: f64) -> f64 {
+    let x = MID_100 + SD_100 * z;
+    let v = if x <= 85.0 {
+        x
+    } else {
+        85.0 + 14.0 * ((x - 85.0) / 14.0).tanh()
+    };
+    v.clamp(25.0, 99.0)
+}
+
 fn to20(z: f64) -> f64 {
-    (MID_20 + SD_20 * z).clamp(1.0, 20.0)
+    (to100(z) / 5.0).clamp(1.0, 20.0)
 }
 
 /// Note estimée quand les stats ne la mesurent pas (ou pas assez de parties) :
@@ -792,18 +859,73 @@ fn estimated(a: Attr, p: &Profile, off: f64) -> Score {
     let value = to20(off + bonus);
     Score {
         value,
-        low: (value - 3.0).clamp(1.0, 20.0),
-        high: (value + 3.0).clamp(1.0, 20.0),
+        low: (value - 2.0).clamp(1.0, 20.0),
+        high: (value + 2.0).clamp(1.0, 20.0),
         estimated: true,
     }
 }
 
-/// Potentiel sur 100 : le niveau, plus une marge de progression selon l'âge
-/// (2 points par année avant 24 ans). // estimé : courbe de progression usuelle
-/// des joueurs pro, à calibrer avec la carrière des joueurs (M10).
-pub fn potential(level: f64, age: Option<u32>) -> f64 {
-    let growth = age.map_or(4.0, |a| (24.0 - a as f64).max(0.0) * 2.0);
-    (level + growth).clamp(level, 99.0)
+/// Progression réelle des joueurs selon l'âge, mesurée sur leurs saisons successives
+/// (12 ans d'historique) : pour chaque âge, évolution moyenne du niveau d'une année
+/// sur l'autre et dispersion de cette évolution, en points sur 100.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AgeCurve {
+    /// Âge (au 1er janvier de la saison) → (évolution moyenne, écart-type, nombre de cas).
+    pub by_age: BTreeMap<u32, (f64, f64, usize)>,
+}
+
+/// Cas minimum pour retenir un âge ; en dessous, on prend l'âge voisin.
+const MIN_AGE_CASES: usize = 15;
+
+impl AgeCurve {
+    /// `pairs` : (âge en début de saison, évolution du niveau sur 100 jusqu'à la suivante).
+    pub fn from_pairs(pairs: &[(u32, f64)]) -> Self {
+        let mut by: BTreeMap<u32, Vec<(f64, f64)>> = BTreeMap::new();
+        for (age, d) in pairs {
+            by.entry(*age).or_default().push((*d, 1.0));
+        }
+        AgeCurve {
+            by_age: by
+                .into_iter()
+                .filter(|(_, v)| v.len() >= MIN_AGE_CASES)
+                .filter_map(|(a, v)| mean_sd(&v).map(|(m, sd)| (a, (m, sd, v.len()))))
+                .collect(),
+        }
+    }
+
+    fn at(&self, age: u32) -> Option<(f64, f64)> {
+        let (_, v) = self
+            .by_age
+            .iter()
+            .min_by_key(|(a, _)| (a.abs_diff(age), **a))?;
+        Some((v.0, v.1))
+    }
+
+    /// Potentiel sur 100 : le niveau, plus la progression moyenne des joueurs de son
+    /// âge jusqu'à leur pic (somme des années où ils progressent en moyenne), plus
+    /// une marge pour les jeunes : la moitié de la dispersion à leur âge (certains
+    /// progressent bien plus que la moyenne). Âge inconnu : 22 ans.
+    pub fn potential(&self, level: f64, age: Option<u32>) -> f64 {
+        let age = age.unwrap_or(22);
+        let mut growth = 0.0;
+        // Âges mesurés seulement (au-delà du dernier âge mesuré : plus de progression).
+        let first = self.by_age.keys().next().copied().unwrap_or(age);
+        for a in age.max(first)..=35 {
+            if let Some((m, _, _)) = self.by_age.get(&a) {
+                growth += m.max(0.0);
+            }
+        }
+        // Plus jeune que le premier âge mesuré : ces années comptent comme ce premier âge.
+        if age < first {
+            growth += f64::from(first - age) * self.at(first).map_or(0.0, |v| v.0.max(0.0));
+        }
+        let upside = if age < 24 {
+            self.at(age).map_or(0.0, |(_, sd)| 0.5 * sd)
+        } else {
+            0.0
+        };
+        (level + growth + upside).clamp(level, 99.0)
+    }
 }
 
 fn max_key<K: Ord>(m: &BTreeMap<K, f64>) -> &K {
@@ -943,6 +1065,8 @@ mod tests {
             deaths_15: Some((1.0 - 0.4 * q).max(0.0)),
             first_blood: Some(q > 0.5),
             team_gold_diff_15: Some(if i.is_multiple_of(3) { -2000.0 } else { 1000.0 }),
+            team_strength: None,
+            team_game: u64::from(i) * 1000 + player.len() as u64,
         }
     }
 
@@ -1025,7 +1149,7 @@ mod tests {
         let r = rate(&sample(), &params());
         let s = r["star"].attrs[&Attr::Shotcalling];
         assert!(s.estimated);
-        assert!(s.high - s.low >= 5.0);
+        assert!(s.high - s.low >= 4.0);
     }
 
     #[test]
@@ -1034,10 +1158,23 @@ mod tests {
     }
 
     #[test]
-    fn potentiel_selon_l_age() {
-        assert_eq!(potential(70.0, Some(19)), 80.0);
-        assert_eq!(potential(70.0, Some(27)), 70.0);
-        assert_eq!(potential(95.0, Some(17)), 99.0);
+    fn potentiel_selon_la_progression_observee() {
+        // Les jeunes progressent de 3 points par an jusqu'à 22 ans, puis plus rien.
+        let mut pairs = Vec::new();
+        for i in 0..20 {
+            let noise = (i % 5) as f64 - 2.0;
+            for age in 17..22 {
+                pairs.push((age, 3.0 + noise));
+            }
+            for age in 22..30 {
+                pairs.push((age, -0.5 + noise));
+            }
+        }
+        let c = AgeCurve::from_pairs(&pairs);
+        let young = c.potential(70.0, Some(19));
+        assert!(young > 78.0 && young < 82.0, "{young}"); // 3 ans × 3 + marge
+        assert_eq!(c.potential(70.0, Some(27)), 70.0);
+        assert_eq!(c.potential(95.0, Some(17)), 99.0);
     }
 
     #[test]

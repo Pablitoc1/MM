@@ -56,23 +56,36 @@ téléchargement automatique, « quota dépassé », et on ne contourne pas un q
    que rien ne relie aux autres. Académies : a priori = ligue principale − 1,5.
    Résultat : LCK +0,84, LPL +0,61, LEC 0, LCKCL −0,03, LCS −0,11, LCP −0,29,
    LDL −0,35, LFL −0,47 … NLC −1,29.
-5. **Passage à l'échelle de la LEC** : z = décalage moyen des ligues où il a joué
-   (pondéré comme ses parties) + écart avec sa ligue × lissage × transfert.
-   Lissage = w / (w + 12), w = parties pondérées. Transfert : dans une ligue plus
-   faible, dominer ses adversaires dit moins (équipe, contexte) ; on garde 75 % de
-   l'écart pour une ligue un écart-type sous la LEC, jamais moins de 50 % (`// estimé`).
-6. **Échelle** : note /20 = 10,5 + 3 z (moyenne LEC à 10,5). Fourchette :
-   ± 3 × √(12 / (w + 12)), affichée dès que la demi-largeur dépasse 1,5 point.
-7. **Niveau /100** = 60 + 10 z, z = moyenne pondérée des attributs du poste (support :
-   surtout vision et teamfight ; jungle : lecture de carte et escarmouche ; autres :
-   mécanique, laning, teamfight). Même échelle que les attributs affichés.
-8. **Potentiel /100** = niveau + 2 points par année avant 24 ans, plafonné à 99
-   (`// estimé`, à calibrer avec les carrières en M10). Âge inconnu : +4.
+5. **Force des équipes : Elo mondial** sur toutes les parties de 2014 à 2025, dans
+   l'ordre des dates (K = 24, × 1,5 en playoffs et à l'international, `// estimé`).
+   Une équipe nouvelle part du niveau mesuré de sa ligue (point 4), et chaque année
+   son Elo revient d'un tiers vers ce niveau (changements d'effectif, `// estimé`).
+   1 écart-type de niveau = 193 points d'Elo (même conversion que pour les ligues).
+6. **Apport individuel** : chaque stat est comparée à celles de ses coéquipiers dans
+   la même partie (80 % de leur moyenne retirée, `// estimé`), pour qu'une
+   super-équipe ne gonfle pas tous ses joueurs. Les écarts hors normes (au-delà
+   d'un écart-type) disent surtout un style de jeu : ils sont resserrés en douceur
+   (`// estimé`). Lissage w / (w + 12) selon le nombre de parties. Dans une ligue
+   plus faible, l'apport compte un peu moins (75 % pour un écart-type sous la LEC).
+7. **Niveau** = force moyenne de ses équipes (Elo, pondérée comme ses parties)
+   + 70 % de l'apport individuel (`// estimé` : les stats viennent aussi de l'équipe).
+   **Échelle /100** : 75 + 10 z, une équipe moyenne de LEC à 75, resserrée au-dessus
+   de 85 pour que seuls les meilleurs du monde approchent 95-99. Moyennes :
+   LCK 85, LPL 81, LEC 77, LCS 75, LCKCL 71, LFL 69, NLC 62. **Attributs /20** : même
+   échelle divisée par 5 (15/20 = 75/100), centrés sur la force de ses équipes.
+   Fourchette : ± 2 × √(12 / (w + 12)), affichée dès que la demi-largeur dépasse 1.
+8. **Potentiel /100** : mesuré sur les vraies carrières. Pour chaque âge, évolution
+   moyenne du niveau d'une saison à la suivante (joueurs de la base dont on connaît
+   la date de naissance, 12 ans de saisons) : environ +3 points par an à 17-18 ans,
+   +1,5 à 19-20, 0 à 21, puis légère baisse. Potentiel = niveau + somme des
+   progressions moyennes de son âge jusqu'au pic + la moitié de la dispersion à son
+   âge s'il a moins de 24 ans (certains progressent bien plus que la moyenne).
+   Plafond 99. Âge inconnu : 22 ans.
 
 ## Ce que les stats ne mesurent pas
 
 Shotcalling, communication et professionnalisme sont marqués « estimé » et toujours
-affichés en fourchette de ± 3 : niveau de la ligue, plus un bonus d'expérience
+affichés en fourchette de ± 2 : force de ses équipes, plus un bonus d'expérience
 (jusqu'à 4 saisons pleines, toutes les parties de la carrière) et, pour le shotcalling, un bonus de poste (support,
 jungle, mid). Ils seront affinés quand le staff et les rapports de scouts arriveront.
 
