@@ -4,6 +4,11 @@ import { App } from './App';
 
 // Pixi ne tourne pas dans jsdom : la carte est remplacée par un cadre vide.
 vi.mock('./match/MatchMap', () => ({ MatchMap: () => <div data-testid="match-map" /> }));
+// Le moteur ne tourne pas dans les tests : le flux est le faux match scripté.
+vi.mock('./api', async (original) => ({
+  ...(await original<typeof import('./api')>()),
+  simulateMatch: async () => (await import('./match/demoReplay')).buildDemoReplay(),
+}));
 import { NAV } from './nav';
 
 describe('App', () => {
@@ -26,10 +31,10 @@ describe('App', () => {
     expect(screen.getByText('Cet écran arrive au jalon M7.')).toBeInTheDocument();
   });
 
-  it('ouvre le match en direct avec le score et les commandes de lecture', () => {
+  it('ouvre le match en direct avec le score et les commandes de lecture', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Match en direct' }));
-    expect(screen.getByTestId('match-map')).toBeInTheDocument();
+    expect(await screen.findByTestId('match-map')).toBeInTheDocument();
     expect(screen.getByTestId('match-kills')).toHaveTextContent('0 – 0');
     // Plein écran, comme la maquette : plus de menu, une barre du match en haut.
     expect(screen.queryByRole('button', { name: 'Effectif' })).not.toBeInTheDocument();

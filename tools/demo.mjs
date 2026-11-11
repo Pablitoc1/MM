@@ -47,6 +47,12 @@ const SHOTS = {
     { name: 'caps-statistiques', steps: [{ click: 'Effectif' }, { select: ['Club', 'G2 Esports'] }, { player: 'Caps' }, { tab: 'Statistiques' }] },
     { name: 'effectif-niveaux-karmine-corp-blue', steps: [{ click: 'Effectif' }, { select: ['Club', 'Karmine Corp Blue'] }] },
   ],
+  // M3 : une partie simulée par le moteur (KC contre G2, graine 1), farm seulement.
+  M3: [
+    { name: '01-premieres-vagues-1m10', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 70 }] },
+    { name: '02-jungle-3m00', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 180 }] },
+    { name: '03-farm-10m00', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 600 }] },
+  ],
   // Vue 2D du match (préparation de M6), sur le faux match KC contre G2.
   'vue-2d': [
     { name: '01-debut-0m45', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 45 }] },

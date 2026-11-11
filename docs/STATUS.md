@@ -35,8 +35,10 @@ monté sur les composants d'interface préparés à part.
 
 ## M3 · où on en est
 Moteur seconde par seconde : carte en réseau de points, vagues, tours, camps, farm, vision et balises,
-flux de la vue 2D (note 009). `just sim KC G2 --n 100` compare les CS, l'or et l'XP à la LEC 2025
-(rapport dans `docs/demo/M3/`).
+flux de la vue 2D (note 010). `just sim KC G2 --n 100` compare les CS, l'or et l'XP à la LEC 2025
+(rapport dans `docs/demo/M3/`). L'écran Match en direct joue une partie du moteur (app : simulée à la
+demande ; navigateur : partie KC–G2 graine 1, `data/seed/public/match-demo.json`).
+Les attributs des notes M2 sont lus par le moteur (farm et mécanique en M3).
 
 ## Ce qui manque
 M3 en cours (voir plus haut), puis M4 · Combat et M5 · IA d'équipe.

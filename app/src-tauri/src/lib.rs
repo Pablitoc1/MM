@@ -61,6 +61,20 @@ fn player(seed: State<Seed>, person_id: String) -> Result<Option<PlayerDetail>, 
     with_db(&seed, |db| db.player(&person_id))
 }
 
+/// Simule une partie entre deux clubs de LEC et renvoie son flux pour la vue 2D (M3 : 15 min de farm).
+#[tauri::command]
+fn simulate_match(
+    seed: State<Seed>,
+    blue: String,
+    red: String,
+    match_seed: u64,
+) -> Result<mm_world::mm_engine::Replay, String> {
+    let db = seed.0.lock().map_err(|e| e.to_string())?;
+    let setup = mm_world::lineup::lec_match(&db, &blue, &red, match_seed, 15.0)
+        .map_err(|e| e.to_string())?;
+    Ok(mm_world::mm_engine::simulate(&setup).replay)
+}
+
 pub fn run() {
     let builder = tauri::Builder::default();
     // Mise à jour automatique : l'interface cherche une nouvelle version au lancement.
@@ -77,7 +91,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            world_info, leagues, teams, roster, player
+            world_info,
+            leagues,
+            teams,
+            roster,
+            player,
+            simulate_match
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application");

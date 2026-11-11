@@ -1,8 +1,8 @@
 // Écran « Match en direct » (maquette v2), en plein écran : barre du match en haut,
 // tableau de score, cartes des 10 joueurs, carte 2D, courbe d'écart d'or et fil du match.
-// Tout est lu depuis le flux du match ; aujourd'hui le faux match de démonstration, en M6 le moteur.
+// Tout est lu depuis le flux du match, produit par le moteur (M3 : farm seulement).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { assetUrl, getRoster, listTeams } from '../api';
+import { assetUrl, getRoster, listTeams, simulateMatch } from '../api';
 import { Icon } from '../components/Icon';
 import { GoldDiffChart, GoldLegend, formatEcart, summarizeGold, type GoldEvent } from '../components/ui';
 import { buildDemoReplay } from '../match/demoReplay';
@@ -121,8 +121,24 @@ function nearAction(replay: MatchReplay, t: number): boolean {
     && t >= e.t - before && t <= e.t + after);
 }
 
+/** Charge la partie simulée par le moteur ; le faux match scripté reste en secours. */
 export function MatchLive({ onExit }: { onExit?: () => void }) {
-  const replay = useMemo(() => buildDemoReplay(), []);
+  const [replay, setReplay] = useState<MatchReplay | null>(null);
+  useEffect(() => {
+    let live = true;
+    simulateMatch('KC', 'G2', 1)
+      .then((r) => { if (live) setReplay(r); })
+      .catch((e) => {
+        console.error('partie simulée', e);
+        if (live) setReplay(buildDemoReplay());
+      });
+    return () => { live = false; };
+  }, []);
+  if (!replay) return <div className="match-loading">Simulation de la partie…</div>;
+  return <MatchView replay={replay} onExit={onExit} />;
+}
+
+function MatchView({ replay, onExit }: { replay: MatchReplay; onExit?: () => void }) {
   const effects = useMemo(() => analyzeEffects(replay), [replay]);
   const looks = useTeamLooks(replay);
   const timeRef = useRef(0);

@@ -4,7 +4,7 @@
 //! exactement la même partie (voir `docs/decisions/002-determinisme.md`).
 //!
 //! M3 : carte en réseau de points, vagues, bâtiments, camps, farm et vision
-//! (note `docs/decisions/009-moteur-carte-et-farm.md`).
+//! (note `docs/decisions/010-moteur-carte-et-farm.md`).
 
 pub mod geo;
 pub mod map;
