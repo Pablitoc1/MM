@@ -91,3 +91,45 @@
 .champs { display: flex; gap: 3px; }
 .champs img { border-radius: 6px; object-fit: cover; }
 .note { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+/* Fiche joueur (M2) */
+.player-head { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+.player-head__photo {
+  width: 96px; height: 96px; border-radius: 50%; object-fit: cover; object-position: top; flex: none;
+  background: var(--bg-active); border: 3px solid var(--team-us); font-size: 32px;
+}
+.player-head__id { flex: 1 1 240px; display: flex; flex-direction: column; gap: 6px; }
+.player-head__role { display: flex; align-items: center; gap: 8px; }
+.player-head__facts { margin: 0; }
+.player-head__scores { display: flex; gap: 12px; }
+.big-score {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px;
+  padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-active);
+}
+.big-score__value { font-family: var(--font-title); font-size: 30px; }
+.big-score__value--gold { color: var(--gold-value); }
+.big-score__value--blue { color: var(--accent-blue); }
+.attr { display: grid; grid-template-columns: 130px 1fr 48px; align-items: center; gap: 10px; min-height: 28px; }
+.attr__label { font-size: 13px; }
+.attr__track { position: relative; height: 8px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
+.attr__fill, .attr__range { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; }
+.attr__fill--high { background: var(--team-us); }
+.attr__fill--mid { background: var(--accent-gold); }
+.attr__fill--low { background: var(--team-them); }
+.attr__range { background: var(--accent-blue); opacity: .6; }
+.attr__value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.attr__value--high { color: var(--team-us); }
+.attr__value--mid { color: var(--text); }
+.attr__value--low { color: var(--team-them); }
+.attr__value--range { color: var(--accent-blue); }
+.attr__tag { display: block; margin: -4px 0 4px; font-size: 11px; color: var(--text-muted); }
+.champ-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.champ-list li { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; }
+.champ-list img { border-radius: 6px; object-fit: cover; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; }
+.facts dt { color: var(--text-muted); }
+.facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.btn--small { min-height: 36px; padding: 0 12px; }
+.linklike { background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-align: left; }
+.linklike:hover strong { color: var(--team-us); }
+.level { color: var(--gold-value); font-variant-numeric: tabular-nums; }

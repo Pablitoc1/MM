@@ -1,4 +1,4 @@
-# 008 · Liens de test et mise à jour automatique
+# 009 · Liens de test et mise à jour automatique
 
 Date : 11 novembre 2026. Demandé par Yahia (« on fait les 2 pour simplifier le process »).
 
