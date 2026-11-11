@@ -30,7 +30,14 @@
 .live-kills .muted { font-size: 22px; }
 .live-clock { font-size: 14px; font-weight: 600; background: var(--bg-active); border-radius: 6px; padding: 2px 10px; font-variant-numeric: tabular-nums; }
 .live-winner { font-weight: 700; font-size: 13px; }
-.live-stats { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; }
+.live-stats { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
+.live-stats__side { display: flex; align-items: center; gap: 22px; }
+/* Côté bleu : du centre vers la gauche ; côté rouge : du centre vers la droite. */
+.live-stats__side--us { flex-direction: row-reverse; }
+.live-stats__side--us .live-stat { flex-direction: row-reverse; }
+.live-stat--gold { gap: 10px; font-size: 15px; }
+.live-objective--dim { filter: grayscale(1) brightness(.6); }
+@media (max-width: 720px) { .live-stats { grid-template-columns: 1fr; justify-items: center; } .live-stats__side--us { flex-direction: row; } }
 .live-stat { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .live-stat__icon { display: flex; }
 .live-objective { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--objective-void); box-shadow: 0 0 0 1px var(--bg-page); object-fit: cover; display: block; flex: none; }

@@ -25,7 +25,6 @@ export interface TeamLook {
 
 export function ScoreBoard({ replay, state, looks }: { replay: MatchReplay; state: MatchState; looks: [TeamLook, TeamLook] }) {
   const [blue, red] = replay.teams;
-  const o = state.objectives;
   return (
     <section className="card live-score" aria-label="Score">
       <div className="live-score__top">
@@ -45,38 +44,53 @@ export function ScoreBoard({ replay, state, looks }: { replay: MatchReplay; stat
           <div><div className="live-team__name">{red.name}</div><div className="muted live-team__side">Côté rouge</div></div>
         </div>
       </div>
+      {/* En miroir : l'or au centre, puis tours, dragons, larves et Nashor de chaque côté. */}
       <div className="live-stats">
-        <Stat label="Or" a={formatGold(state.gold[0])} b={formatGold(state.gold[1])} icon={<CoinIcon />} />
-        <Stat label="Tours" a={state.towers[0]} b={state.towers[1]} icon={<TowerIcon />} />
-        <Stat label="Dragons" a={o[0].dragons.length} b={o[1].dragons.length}
-          icon={<DragonStack dragons={[...o[0].dragons, ...o[1].dragons]} />} />
-        <Stat label="Larves" a={o[0].grubs} b={o[1].grubs} icon={<Objective src={localAsset('camps/voidgrubs.webp')} />} />
-        <Stat label="Nashor" a={o[0].barons} b={o[1].barons} icon={<Objective src={localAsset('camps/baron.webp')} />} />
+        <TeamStats state={state} team={0} />
+        <div className="live-stat live-stat--gold" aria-label={`Or : ${formatGold(state.gold[0])} contre ${formatGold(state.gold[1])}`}>
+          <strong style={{ color: TEAM_VAR[0] }}>{formatGold(state.gold[0])}</strong>
+          <span className="muted live-stat__icon" title="Or"><CoinIcon /></span>
+          <strong style={{ color: TEAM_VAR[1] }}>{formatGold(state.gold[1])}</strong>
+        </div>
+        <TeamStats state={state} team={1} />
       </div>
       <ProbabilityBar us={state.blueWin * 100} showLabel height={8} />
     </section>
   );
 }
 
-function Stat({ label, a, b, icon }: { label: string; a: number | string; b: number | string; icon: React.ReactNode }) {
+/** Les objectifs d'une équipe, de son côté du bandeau : du centre vers l'extérieur. */
+function TeamStats({ state, team }: { state: MatchState; team: TeamIndex }) {
+  const o = state.objectives[team];
+  const tag = team === 0 ? 'bleu' : 'rouge';
+  const items: { label: string; value: number; icon: React.ReactNode }[] = [
+    { label: 'Tours', value: state.towers[team], icon: <TowerIcon team={team} /> },
+    { label: 'Dragons', value: o.dragons.length, icon: <DragonStack dragons={o.dragons} /> },
+    { label: 'Larves', value: o.grubs, icon: <Objective src={localAsset('camps/voidgrubs.webp')} dim={o.grubs === 0} /> },
+    { label: 'Nashor', value: o.barons, icon: <Objective src={localAsset('camps/baron.webp')} dim={o.barons === 0} /> },
+  ];
   return (
-    <div className="live-stat" aria-label={`${label} : ${a} contre ${b}`}>
-      <strong style={{ color: TEAM_VAR[0] }}>{a}</strong>
-      <span className="muted live-stat__icon" title={label}>{icon}</span>
-      <strong style={{ color: TEAM_VAR[1] }}>{b}</strong>
+    <div className={`live-stats__side live-stats__side--${team === 0 ? 'us' : 'them'}`}>
+      {items.map((it) => (
+        <div key={it.label} className="live-stat" aria-label={`${it.label} côté ${tag} : ${it.value}`} title={it.label}>
+          <span className="live-stat__icon">{it.icon}</span>
+          <strong style={{ color: TEAM_VAR[team] }}>{it.value}</strong>
+        </div>
+      ))}
     </div>
   );
 }
 
-function Objective({ src, ring = 'var(--objective-void)' }: { src: string; ring?: string }) {
-  return <img className="live-objective" src={src} alt="" width={20} height={20} style={{ borderColor: ring }} />;
+function Objective({ src, ring = 'var(--objective-void)', dim = false }: { src: string; ring?: string; dim?: boolean }) {
+  return <img className={`live-objective${dim ? ' live-objective--dim' : ''}`} src={src} alt="" width={20} height={20} style={{ borderColor: ring }} />;
 }
 
 function DragonStack({ dragons }: { dragons: string[] }) {
-  const shown = dragons.length ? dragons : ['Infernal'];
+  // Aucun dragon : une icône éteinte garde la place.
+  if (!dragons.length) return <Objective src={dragonIcon('Infernal')} ring="var(--map-camp-taken)" dim />;
   return (
     <span className="live-dragons">
-      {shown.slice(0, 4).map((v, i) => (
+      {dragons.slice(0, 4).map((v, i) => (
         <Objective key={i} src={dragonIcon(v)} ring={v === 'Océan' ? 'var(--drake-ocean)' : 'var(--drake-infernal)'} />
       ))}
     </span>
@@ -88,13 +102,13 @@ const CoinIcon = () => (
     <ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
   </svg>
 );
-/** Tour du bandeau, gemme neutre (maquette). */
-const TowerIcon = () => (
+/** Tour du bandeau, gemme à la couleur de l'équipe. */
+const TowerIcon = ({ team }: { team: TeamIndex }) => (
   <svg width="14" height="18" viewBox="0 0 20 26" aria-hidden="true">
     <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--tower-body)" stroke="var(--bg-page)" strokeWidth="1.2" />
     <path d="M6 25 L7.5 14 L9 25 Z" fill="var(--tower-light)" />
     <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--tower-top)" stroke="var(--bg-page)" strokeWidth="1" />
-    <path d="M10 1 L14 6 L10 10 L6 6 Z" fill="var(--text-muted)" stroke="var(--bg-page)" strokeWidth="1" />
+    <path d="M10 1 L14 6 L10 10 L6 6 Z" fill={TEAM_VAR[team]} stroke="var(--bg-page)" strokeWidth="1" />
   </svg>
 );
 
