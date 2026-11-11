@@ -1,7 +1,7 @@
 import type { IconName } from './components/Icon';
 
 export type ScreenId =
-  | 'accueil' | 'effectif' | 'entrainement' | 'tactique'
+  | 'accueil' | 'effectif' | 'entrainement' | 'tactique' | 'match'
   | 'recrutement' | 'competitions' | 'finances' | 'direction';
 
 export interface NavItem {
@@ -17,6 +17,7 @@ export const NAV: NavItem[] = [
   { id: 'effectif', label: 'Effectif', icon: 'users', milestone: 'M1' },
   { id: 'entrainement', label: 'Entraînement', icon: 'dumbbell', milestone: 'M10' },
   { id: 'tactique', label: 'Tactique', icon: 'target', milestone: 'M7' },
+  { id: 'match', label: 'Match en direct', icon: 'play', milestone: 'M6' },
   { id: 'recrutement', label: 'Recrutement', icon: 'search', milestone: 'M11' },
   { id: 'competitions', label: 'Compétitions', icon: 'trophy', milestone: 'M9' },
   { id: 'finances', label: 'Finances', icon: 'coins', milestone: 'M11' },

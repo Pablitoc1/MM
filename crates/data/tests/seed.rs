@@ -86,6 +86,44 @@ fn base_de_depart_complete() {
         0
     );
 
+    // Notes (M2) : chaque joueur LEC a un niveau et les 15 attributs ;
+    // presque tous sont calculés à partir de leurs parties.
+    let mut from_stats = 0;
+    let mut players = 0;
+    for team in &lec {
+        for m in db.roster(&team.id).unwrap().iter().filter(|m| !m.is_staff) {
+            players += 1;
+            let r = m
+                .rating
+                .as_ref()
+                .unwrap_or_else(|| panic!("{} sans note", m.handle));
+            assert!(
+                (25.0..=99.0).contains(&r.level),
+                "{} : niveau {}",
+                m.handle,
+                r.level
+            );
+            assert!(r.potential >= r.level);
+            if r.source == "stats" {
+                from_stats += 1;
+            }
+            let attrs = db.attributes(&m.person_id).unwrap();
+            assert_eq!(attrs.len(), 15, "{} : {} attributs", m.handle, attrs.len());
+            for a in &attrs {
+                assert!(a.low <= a.value && a.value <= a.high && (1.0..=20.0).contains(&a.value));
+            }
+        }
+    }
+    assert!(
+        from_stats * 10 >= players * 9,
+        "{from_stats} / {players} joueurs LEC notés d'après leurs parties"
+    );
+    // Chaque joueur de la base a une note, dans toutes les ligues.
+    assert_eq!(
+        count(&conn, "SELECT COUNT(DISTINCT person_id) FROM roster WHERE is_staff = 0 AND person_id NOT IN (SELECT person_id FROM player_ratings)"),
+        0
+    );
+
     // Tous les champions du patch de départ.
     assert!(count(&conn, "SELECT COUNT(*) FROM champions") >= 170);
     assert!(count(&conn, "SELECT COUNT(*) FROM items") > 100);

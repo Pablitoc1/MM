@@ -19,6 +19,12 @@ Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
 - Écran Effectif : n'importe quel club LEC, joueurs et staff réels, âge, champions, stats 2025, fin de contrat.
 - `just check`, `just seed`, `just demo M0|M1`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
 
+## En parallèle (préparation de M6, hors plan)
+Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
+(note 003), captures dans `docs/demo/vue-2d/` (`just demo vue-2d`). Le plan ne change pas.
+Écran complet autour de la carte (tableau de score, cartes des 10 joueurs, courbe d'or, fil du match),
+monté sur les composants d'interface préparés à part.
+
 ## En cours : M3 · Carte et déplacements
 Moteur seconde par seconde : carte en réseau de points, vagues, tours, camps, farm, vision et balises,
 flux de la vue 2D (note 009). `just sim KC G2 --n 100` compare les CS, l'or et l'XP à la LEC 2025
