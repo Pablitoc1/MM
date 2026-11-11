@@ -5,6 +5,7 @@ import { assetUrl } from '../../api';
 import { Shell, type NavKey } from '../../components/ui';
 import { EcranAccueil } from './Accueil';
 import { EcranEffectif } from './Effectif';
+import { EcranEntrainement } from './Entrainement';
 import { EcranJoueur } from './Joueur';
 
 export type EcranId = 'accueil' | 'effectif' | 'joueur' | 'entrainement' | 'draft' | 'pause' | 'apres-match';
@@ -15,6 +16,7 @@ export const ECRANS: EcranDef[] = [
   { id: 'accueil', label: 'Accueil', nav: 'accueil', shell: true, render: () => <EcranAccueil /> },
   { id: 'effectif', label: 'Effectif', nav: 'effectif', shell: true, render: () => <EcranEffectif /> },
   { id: 'joueur', label: 'Fiche joueur', nav: 'effectif', shell: true, render: () => <EcranJoueur /> },
+  { id: 'entrainement', label: 'Entraînement', nav: 'entrainement', shell: true, render: () => <EcranEntrainement /> },
 ];
 
 const HREFS: Partial<Record<NavKey, string>> = { accueil: '#accueil', effectif: '#effectif', entrainement: '#entrainement' };
