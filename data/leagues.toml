@@ -1,0 +1,223 @@
+# Ligues importées dans la base, par niveau (tier).
+# `name` = nom exact de la ligue dans Leaguepedia (table Leagues).
+# L'import choisit lui-même le tournoi de référence : le premier tournoi régulier
+# qui commence après le 15 décembre 2025, sinon le dernier de 2025.
+# Liste établie à la main (Leaguepedia ne classe pas les ligues en tiers) :
+# voir docs/decisions/005-ligues-et-tiers.md. Modifiable librement.
+# Absentes car disparues en 2026 : LVP SuperLiga (remplacée par la LES),
+# LFL Division 2 (fondue dans la LFL), Liga Valkyria (format de qualifications).
+
+[[league]]
+id = "LEC"
+name = "LoL EMEA Championship"
+tier = 1
+
+[[league]]
+id = "LCK"
+name = "LoL Champions Korea"
+tier = 1
+
+[[league]]
+id = "LPL"
+name = "Tencent LoL Pro League"
+tier = 1
+
+[[league]]
+id = "LCS"
+name = "League of Legends Championship Series"
+tier = 1
+
+[[league]]
+id = "CBLOL"
+name = "Circuit Brazilian League of Legends"
+tier = 1
+
+[[league]]
+id = "LCP"
+name = "League of Legends Championship Pacific"
+tier = 1
+
+# --- Tier 2 : ligues régionales majeures (ERL en Europe, ligues de développement ailleurs)
+
+[[league]]
+id = "LFL"
+name = "La Ligue Française"
+tier = 2
+
+[[league]]
+id = "PRM"
+name = "Prime League Pro Division"
+tier = 2
+
+[[league]]
+id = "LES"
+name = "Liga Española de League of Legends"
+tier = 2
+
+[[league]]
+id = "LIT"
+name = "LIT"
+tier = 2
+
+[[league]]
+id = "NLC"
+name = "Northern League of Legends Championship"
+tier = 2
+
+[[league]]
+id = "HM"
+name = "Hitpoint Masters"
+tier = 2
+
+[[league]]
+id = "TCL"
+name = "Turkish Championship League"
+tier = 2
+
+[[league]]
+id = "RL"
+name = "Rift Legends"
+tier = 2
+
+[[league]]
+id = "AL"
+name = "Arabian League"
+tier = 2
+
+[[league]]
+id = "EBL"
+name = "Esports Balkan League"
+tier = 2
+
+[[league]]
+id = "HLL"
+name = "Hellenic Legends League"
+tier = 2
+
+[[league]]
+id = "ROL"
+name = "TransIP Road Of Legends"
+tier = 2
+
+[[league]]
+id = "LPLOL"
+name = "Liga Portuguesa"
+tier = 2
+
+[[league]]
+id = "LCKCL"
+name = "LCK Challengers League"
+tier = 2
+
+[[league]]
+id = "LDL"
+name = "LoL Development League"
+tier = 2
+
+[[league]]
+id = "NACL"
+name = "North American Challengers League"
+tier = 2
+
+[[league]]
+id = "CD"
+name = "Circuito Desafiante"
+tier = 2
+
+[[league]]
+id = "LRN"
+name = "Liga Regional Norte"
+tier = 2
+
+[[league]]
+id = "LRS"
+name = "Liga Regional Sur"
+tier = 2
+
+[[league]]
+id = "LJL"
+name = "LoL Japan League"
+tier = 2
+
+[[league]]
+id = "VCS"
+name = "Vietnam Championship Series"
+tier = 2
+
+[[league]]
+id = "PCS"
+name = "Pacific Championship Series"
+tier = 2
+
+[[league]]
+id = "LTS"
+name = "League of Legends Thailand Series"
+tier = 2
+
+# --- Tier 3 : divisions inférieures et ligues nationales plus petites
+
+[[league]]
+id = "PRM1"
+name = "Prime League 1st Division"
+tier = 3
+
+[[league]]
+id = "HC"
+name = "Hitpoint Challengers"
+tier = 3
+
+[[league]]
+id = "HEX"
+name = "Hextech Series 1st Division"
+tier = 3
+
+[[league]]
+id = "NEXO"
+name = "Liga Nexo"
+tier = 3
+
+[[league]]
+id = "AL2"
+name = "Arabian League 2nd Division"
+tier = 3
+
+[[league]]
+id = "BAS"
+name = "Benelux Ascend Series"
+tier = 3
+
+[[league]]
+id = "FPL"
+name = "Finnish Pro League"
+tier = 3
+
+[[league]]
+id = "GGL"
+name = "Good Game-ligaen"
+tier = 3
+
+[[league]]
+id = "DK"
+name = "LOL DK Ligaen"
+tier = 3
+
+[[league]]
+id = "BCL"
+name = "Bulgarian Challengers League"
+tier = 3
+
+[[league]]
+id = "HCC"
+name = "Hellenic Challengers Cup"
+tier = 3
+
+[[league]]
+id = "UKEL"
+name = "4 Nations"
+tier = 3
+
+[[league]]
+id = "LCKAS"
+name = "LCK Academy Series"
+tier = 3
+

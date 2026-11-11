@@ -41,6 +41,6 @@ mod tests {
     fn world_info_nouvelle_partie() {
         let info = world_info();
         assert_eq!(info.date, "Lun. 5 janvier 2026");
-        assert_eq!(info.schema_version, 0);
+        assert_eq!(info.schema_version, 1);
     }
 }
