@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/data", "crates/engine", "crates/world", "app/src-tauri"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.dev.package."*"]
+opt-level = 2

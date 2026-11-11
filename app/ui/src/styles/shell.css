@@ -1,0 +1,44 @@
+.shell { display: flex; flex-direction: column; height: 100%; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 10px 24px; background: var(--bg-bar); border-bottom: 1px solid var(--border);
+}
+.topbar__club { display: flex; align-items: center; gap: 10px; }
+.topbar__badge {
+  width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--bg-active); color: var(--team-us); font-family: var(--font-title); font-weight: 700;
+}
+.topbar__name { font-family: var(--font-title); font-weight: 700; font-size: 17px; }
+.topbar__sub { font-size: 12px; color: var(--text-muted); }
+.topbar__info { display: flex; gap: 18px; color: var(--text-muted); }
+.btn-cta {
+  min-height: 44px; padding: 0 24px; border: none; border-radius: 8px; cursor: pointer;
+  background: var(--team-us); color: var(--bg-page); font-weight: 700; font-size: 15px;
+}
+.btn-cta:disabled { opacity: .45; cursor: not-allowed; }
+
+.body { display: flex; flex: 1; min-height: 0; }
+.sidenav {
+  flex: 0 0 210px; background: var(--bg-bar); padding: 16px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.sidenav__item {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px;
+  border: none; background: transparent; color: var(--text-muted); text-align: left; cursor: pointer;
+}
+.sidenav__item:hover { background: #1a2335; color: var(--text); }
+.sidenav__item[aria-current='page'] { background: var(--bg-active); color: var(--text); font-weight: 600; }
+
+.main { flex: 1; min-width: 0; overflow: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.h1 { margin: 0; font-family: var(--font-title); font-size: 26px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.card__title { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.muted { color: var(--text-muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted); }
+.swatch span:first-child { width: 48px; height: 28px; border-radius: 6px; border: 1px solid var(--border); }
+.milestones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.milestones li { display: flex; gap: 10px; align-items: center; }
+.pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
