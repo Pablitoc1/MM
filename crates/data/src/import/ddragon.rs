@@ -67,7 +67,18 @@ pub fn import(
     }
 
     let items = fetch.get_json(&format!("{CDN}/{version}/data/fr_FR/item.json"))?;
+    let item_dir = images.join("items");
+    std::fs::create_dir_all(&item_dir)?;
     for (id, it) in obj(&items["data"])? {
+        // Icônes des objets de la Faille (carte 11) seulement : la vue du match les affiche.
+        if it["maps"]["11"].as_bool() == Some(true) {
+            let file = str_of(&it["image"]["full"]);
+            save_image(
+                fetch,
+                &item_dir.join(file),
+                &format!("{CDN}/{version}/img/item/{file}"),
+            )?;
+        }
         tx.execute(
             "INSERT INTO items (id, name, gold, data) VALUES (?1, ?2, ?3, ?4)",
             params![
@@ -80,13 +91,28 @@ pub fn import(
     }
 
     let spells = fetch.get_json(&format!("{CDN}/{version}/data/fr_FR/summoner.json"))?;
+    let spell_dir = images.join("spells");
+    std::fs::create_dir_all(&spell_dir)?;
     for (id, s) in obj(&spells["data"])? {
+        let file = str_of(&s["image"]["full"]);
+        save_image(
+            fetch,
+            &spell_dir.join(file),
+            &format!("{CDN}/{version}/img/spell/{file}"),
+        )?;
         tx.execute(
             "INSERT INTO summoner_spells (id, name, data) VALUES (?1, ?2, ?3)",
             params![id, str_of(&s["name"]), s.to_string()],
         )?;
     }
     Ok(ChampionNames(names))
+}
+
+fn save_image(fetch: &Fetcher, dest: &Path, url: &str) -> Result<()> {
+    if !dest.exists() {
+        std::fs::write(dest, fetch.get(url)?)?;
+    }
+    Ok(())
 }
 
 fn obj(v: &Value) -> Result<&serde_json::Map<String, Value>> {
