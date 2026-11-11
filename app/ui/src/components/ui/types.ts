@@ -55,3 +55,9 @@ export interface SquadPlayer {
   contractEndsThisYear?: boolean;
   statuts: Statut[];
 }
+
+/** Poste tel qu'il est écrit dans la base (Leaguepedia) → poste de l'interface. */
+export function roleFromDb(role: string): Role | null {
+  const map: Record<string, Role> = { Top: 'top', Jungle: 'jungle', Mid: 'mid', Bot: 'adc', Support: 'support' };
+  return map[role] ?? null;
+}

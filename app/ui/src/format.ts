@@ -21,6 +21,11 @@ const COUNTRY_CODES: Record<string, string> = {
   Venezuela: 'VE', Vietnam: 'VN', Wales: 'GB',
 };
 
+/** Code ISO 3166-1 d'un pays de Leaguepedia (« France » → « FR »), pour les drapeaux. */
+export function countryCode(country: string | null): string | null {
+  return country ? COUNTRY_CODES[country] ?? null : null;
+}
+
 const REGIONS_FR = new Intl.DisplayNames(['fr'], { type: 'region' });
 
 /** Nom du pays en français ; à défaut, le nom d'origine. */

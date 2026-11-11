@@ -4,6 +4,10 @@ import { useId } from 'react';
 import { ChampionIcon } from './Images';
 import { TONE_VAR, formatEcart, formatNombre } from './tone';
 import type { ChampionRef } from './types';
+// Icônes d'objectifs reprises des maquettes v2.
+import dragonIcon from './assets/dragon.webp';
+import larvesIcon from './assets/larves.webp';
+import nashorIcon from './assets/nashor.webp';
 
 const AXIS_FONT = { fontSize: 11, fontFamily: 'var(--font-body)' };
 
@@ -38,11 +42,88 @@ export function summarizeGold(values: number[]): GoldSummary {
   return { final: values[values.length - 1] ?? 0, worst, best, swingMinute };
 }
 
+export type GoldEventKind = 'kill' | 'dragon' | 'larves' | 'nashor' | 'tour';
+
+export const GOLD_EVENT_LABEL: Record<GoldEventKind, string> = {
+  kill: 'Kill (tueur)', dragon: 'Dragon', tour: 'Tour', larves: 'Larves', nashor: 'Nashor',
+};
+
+/** Icônes des objectifs neutres (maquettes v2). */
+export const OBJECTIVE_ICON: Partial<Record<GoldEventKind, string>> = {
+  dragon: dragonIcon, larves: larvesIcon, nashor: nashorIcon,
+};
+
 export interface GoldEvent {
   minute: number;
   side: 'us' | 'them';
-  /** Ce qui s'est passé : « Dragon », « Premier sang de Yike ». */
+  kind: GoldEventKind;
+  /** Pour un kill : le champion du tueur. */
+  champion?: ChampionRef;
+  /** Ce qui s'est passé : « Premier sang de Yike ». */
   label: string;
+}
+
+/** Tour stylisée des maquettes, avec la gemme à la couleur de l'équipe. */
+function TowerGlyph({ x, y, color }: { x: number; y: number; color: string }) {
+  return (
+    <g transform={`translate(${x - 6} ${y - 8}) scale(0.6)`}>
+      <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--border-strong)" stroke="var(--bg-page)" strokeWidth={1.2} />
+      <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--text-muted)" stroke="var(--bg-page)" strokeWidth={1} />
+      <path d="M10 1 L14 6 L10 10 L6 6 Z" fill={color} stroke="var(--bg-page)" strokeWidth={1} />
+    </g>
+  );
+}
+
+/** Marqueur d'un événement posé sur la courbe : icône ronde cerclée à la couleur de l'équipe. */
+function GoldMarker({ e, cx, cy, uid, i }: { e: GoldEvent; cx: number; cy: number; uid: string; i: number }) {
+  const color = e.side === 'us' ? 'var(--team-us)' : 'var(--team-them)';
+  const src = e.kind === 'kill' ? e.champion?.icon : OBJECTIVE_ICON[e.kind];
+  const r = 10;
+  const clip = `gm${uid}-${i}`;
+  return (
+    <g>
+      <title>{`${e.minute} min · ${e.label}`}</title>
+      {e.kind === 'tour' ? (
+        <>
+          <circle cx={cx} cy={cy} r={r} fill="var(--bg-card)" stroke={color} strokeWidth={2} />
+          <TowerGlyph x={cx} y={cy} color={color} />
+        </>
+      ) : (
+        <>
+          <clipPath id={clip}><circle cx={cx} cy={cy} r={r} /></clipPath>
+          <circle cx={cx} cy={cy} r={r} fill="var(--bg-active)" />
+          {src && <image href={src} x={cx - r} y={cy - r} width={r * 2} height={r * 2} clipPath={`url(#${clip})`} />}
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={2} />
+        </>
+      )}
+    </g>
+  );
+}
+
+/** Légende des marqueurs, comme au-dessus de la courbe des maquettes. */
+function GoldLegend({ kinds, us, them, killIcon }: { kinds: GoldEventKind[]; us: string; them: string; killIcon?: string }) {
+  return (
+    <div className="ui-chart__legend">
+      {kinds.map((k) => {
+        const src = k === 'kill' ? killIcon : OBJECTIVE_ICON[k];
+        return (
+          <span key={k} className="ui-inline" style={{ gap: 5 }}>
+            {k === 'tour' ? (
+              <svg width="12" height="16" viewBox="0 0 20 26" aria-hidden="true">
+                <path d="M4 25 L6 12 L14 12 L16 25 Z" fill="var(--border-strong)" />
+                <path d="M3 12 L17 12 L15 9 L5 9 Z" fill="var(--text-muted)" />
+                <path d="M10 1 L14 6 L10 10 L6 6 Z" fill="var(--team-us)" />
+              </svg>
+            ) : src ? (
+              <img src={src} alt="" width={16} height={16} style={{ borderRadius: '50%' }} />
+            ) : null}
+            {GOLD_EVENT_LABEL[k]}
+          </span>
+        );
+      })}
+      <span>Contour <span style={{ color: 'var(--team-us)' }}>{us}</span> / <span style={{ color: 'var(--team-them)' }}>{them}</span></span>
+    </div>
+  );
 }
 
 export interface GoldDiffChartProps {
@@ -89,6 +170,10 @@ export function GoldDiffChart({ values, us, them, events = [] }: GoldDiffChartPr
         )}
         {s.swingMinute !== undefined && <span> · bascule à {s.swingMinute} min</span>}
       </figcaption>
+      {events.length > 0 && (
+        <GoldLegend us={us} them={them} killIcon={events.find((e) => e.kind === 'kill')?.champion?.icon}
+          kinds={(Object.keys(GOLD_EVENT_LABEL) as GoldEventKind[]).filter((k) => events.some((e) => e.kind === k))} />
+      )}
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={aria} style={{ width: '100%', height: 'auto' }}>
         <defs>
           <clipPath id={up}><rect x="0" y="0" width={W} height={mid} /></clipPath>
@@ -113,12 +198,7 @@ export function GoldDiffChart({ values, us, them, events = [] }: GoldDiffChartPr
         <polyline points={pts} fill="none" stroke="var(--team-them)" strokeWidth={2.5} strokeLinejoin="round" clipPath={`url(#${dn})`} />
         {events.map((e, i) => {
           const v = values[Math.min(Math.max(Math.round(e.minute), 0), values.length - 1)] ?? 0;
-          return (
-            <circle key={i} cx={x(e.minute)} cy={y(v)} r={5.5} fill="var(--bg-card)" strokeWidth={2.5}
-              stroke={e.side === 'us' ? 'var(--team-us)' : 'var(--team-them)'}>
-              <title>{`${e.minute} min · ${e.label}`}</title>
-            </circle>
-          );
+          return <GoldMarker key={i} e={e} cx={x(e.minute)} cy={y(v)} uid={uid} i={i} />;
         })}
       </svg>
     </figure>

@@ -143,16 +143,20 @@ export function InboxItem({ kind, kindTone = 'neutral', title, time, body, unrea
   );
 }
 
-/** Membre du staff : initiales du poste, nom, étoiles. */
-export function StaffRow({ initials, role, name, stars }: { initials: string; role: string; name?: string; stars: number }) {
+/** Membre du staff : photo (ou initiales du poste), poste, nom, étoiles. */
+export function StaffRow({ initials, role, name, photo, stars }: {
+  initials: string; role: string; name?: string; photo?: string; stars?: number;
+}) {
   return (
     <div className="ui-staff">
-      <span className="ui-staff__badge" aria-hidden="true">{initials}</span>
+      {photo
+        ? <PlayerPhoto name={name ?? role} src={photo} size={34} ring="var(--bg-active)" />
+        : <span className="ui-staff__badge" aria-hidden="true">{initials}</span>}
       <div className="ui-staff__body">
-        <span className="ui-staff__role">{role}</span>
-        <span className="muted">{name ?? 'Nom à charger depuis la base'}</span>
+        <span className="ui-staff__role">{name ?? role}</span>
+        <span className="muted">{name ? role : 'Nom à charger depuis la base'}</span>
       </div>
-      <Stars value={stars} />
+      {stars !== undefined && <Stars value={stars} />}
     </div>
   );
 }
