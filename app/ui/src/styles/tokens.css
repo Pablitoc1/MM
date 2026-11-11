@@ -15,6 +15,15 @@
   --accent-gold: #c8aa6e; /* icônes de rôle, étoiles */
   --gold-value: #e2c46b;
 
+  /* Composants des maquettes v2 (jauges, tags, graphiques). */
+  --text-soft: #c9d1df;     /* texte des messages */
+  --teal-text: #5fd4c8;     /* texte teal lisible sur fond sombre */
+  --track: #263248;         /* fond des jauges et barres */
+  --grid-line: #222c40;     /* lignes de repère des graphiques */
+  --row-hover: #1c2537;     /* survol d'une ligne de tableau */
+  --warn-bg: #2a2418;       /* bandeau d'alerte orange */
+  --hero-bg: #1b2a3a;       /* départ du dégradé des cartes en avant */
+
   --font-body: 'Inter', system-ui, sans-serif;
   --font-title: 'Space Grotesk', 'Inter', sans-serif;
   --radius: 12px;
