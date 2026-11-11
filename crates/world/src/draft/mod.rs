@@ -1,10 +1,10 @@
-//! Draft : règles officielles (ordre, bans, Fearless) et connaissance du patch.
-//! L'IA de draft arrive dans `ai` (PR suivante).
+//! Draft : règles officielles (ordre, bans, Fearless), connaissance du patch et IA.
 //!
 //! La draft rend, pour chaque côté, 5 [`Pick`] (rôle, joueur, champion) que le moteur
 //! lit pour monter le match. Tout aléatoire passe par `SimRng` : la même graine donne
-//! la même draft. Voir `docs/decisions/011-regles-de-draft.md`.
+//! la même draft. Voir les notes 011 (règles) et 012 (IA).
 
+pub mod ai;
 pub mod knowledge;
 pub mod styles;
 
@@ -13,6 +13,7 @@ use std::fmt;
 
 use serde::Serialize;
 
+pub use ai::{auto_draft, choose, rank, Candidate, Reason};
 pub use knowledge::{ChampInfo, DraftPlayer, DraftTeam, Knowledge};
 pub use styles::{analyse, CompAnalysis, Style};
 
