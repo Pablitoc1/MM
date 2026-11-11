@@ -3,8 +3,8 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-Aucun. M2 · Notes des joueurs validé par Yahia le 11 novembre 2026 (PR #12 et #13).
-Prochain jalon : M3, à lancer quand Yahia dit « go M3 ».
+M3 · Carte et déplacements : lancé avec l'accord de Yahia dans le fil « Construire le moteur de match » (puis M4 et M5).
+Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novembre 2026 (PR #12 et #13).
 
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
@@ -31,8 +31,8 @@ Vue 2D du match sur un faux match scripté : écran « Match en direct », forma
 Écran complet autour de la carte (tableau de score, cartes des 10 joueurs, courbe d'or, fil du match),
 monté sur les composants d'interface préparés à part.
 
-## Ce qui manque (prochain jalon)
-M3 · Carte et déplacements.
+## Ce qui manque
+M3 en cours (voir plus haut), puis M4 · Combat et M5 · IA d'équipe.
 Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
 postes (Rekkles noté sur ses seules parties de support) ; les notes n'évoluent pas encore (M10).
 
