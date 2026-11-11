@@ -24,6 +24,8 @@ Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novemb
 - Fiche joueur (aperçu, attributs, champions, statistiques, contrat), ouverte depuis l'Effectif,
   qui affiche aussi niveau et potentiel.
 - `just check`, `just seed`, `just demo M0|M1|M2`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
+- Lien de test web sur chaque PR, et mise à jour automatique du jeu installé à chaque fusion
+  dans `main` (décision 009).
 
 ## En parallèle (préparation de M6, hors plan)
 Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux

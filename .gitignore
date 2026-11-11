@@ -6,3 +6,4 @@ data/raw/
 *.db
 *.db-journal
 .DS_Store
+app/src-tauri/tauri.version.json

@@ -15,3 +15,11 @@ Prérequis : Rust stable, Node 22, [just](https://github.com/casey/just) et les
 just check   # tous les contrôles
 just dev     # l'application
 ```
+
+## Tester et mettre à jour
+
+- **Une PR** : un lien « version web » est posté en commentaire de la PR. Il s'ouvre dans le
+  navigateur, sans rien installer. Les installateurs de la PR sont aussi dans l'onglet Actions.
+- **Le jeu installé** : chaque fusion dans `main` publie une nouvelle version. Au lancement, le
+  jeu la propose dans un bandeau « Mettre à jour ». Il suffit de l'installer une seule fois depuis
+  la page [Releases](https://github.com/Pablitoc1/MM/releases/latest).

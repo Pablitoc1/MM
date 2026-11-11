@@ -18,6 +18,13 @@
 }
 .btn-cta:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Bandeau « nouvelle version disponible » (application installée). */
+.update-banner {
+  display: flex; align-items: center; gap: 12px; padding: 8px 24px;
+  background: var(--teal-bg); border-bottom: 1px solid var(--team-us); color: var(--text);
+}
+.update-banner .btn-cta { min-height: 32px; padding: 0 16px; font-size: 13px; }
+
 .body { display: flex; flex: 1; min-height: 0; }
 .sidenav {
   flex: 0 0 210px; background: var(--bg-bar); padding: 16px 12px;

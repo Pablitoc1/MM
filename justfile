@@ -31,6 +31,10 @@ dev-web:
 seed:
     cargo run --release -p mm-data --features import --bin seed
 
+# Refait seulement les données de la draft (CSV d'Oracle's Elixir dans data/raw/oracles/).
+seed-draft:
+    cargo run --release -p mm-data --features import --bin seed -- --draft
+
 # Simule des parties sans interface et les compare à la LEC 2025.
 # Exemple : just sim KC G2 --n 100 --report docs/demo/M3/rapport-farm.md --replay partie.json
 sim *args:
