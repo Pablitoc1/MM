@@ -197,7 +197,7 @@ describe('données de la base', () => {
   const base: RosterMember = {
     personId: 'Caliste', handle: 'Caliste', realName: 'Caliste Henry-Hennebert', country: 'France',
     birthdate: '2006-08-28', role: 'Bot', isStaff: false, photoFile: 'photos/caliste.jpeg',
-    contractEnd: '2026-11-20', stats2025: null, topChampions: ['Ezreal', 'Varus'],
+    contractEnd: '2026-11-20', stats2025: null, topChampions: ['Ezreal', 'Varus'], rating: null,
   };
   const extras = { level: 4, potential: 5, form: [], morale: 80, fatigue: 20, value: 1, statuts: [] };
 

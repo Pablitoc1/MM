@@ -39,8 +39,14 @@ coup d'un joueur moyen (0,80), la part du support (0,50), l'or qui déclenche un
 - **Jungle +33 % de CS** : le jungler ne fait que farmer. Les pros gankent, prennent les dragons
   et les larves : c'est M5 qui fermera l'écart, on ne fausse pas les camps pour le cacher.
 - **Support +38 % d'XP** : il ne quitte jamais sa voie (pas de roam avant M5).
-- **Dispersion trop faible** (± 3 CS contre ± 11) : tous les joueurs ont les notes moyennes et
-  personne ne meurt. Les vraies notes (M2) et les combats (M4) l'élargiront.
+- **Dispersion trop faible** (± 3 CS contre ± 11) : personne ne meurt et les matchups ne comptent
+  pas encore. Les combats (M4) l'élargiront.
+
+## Notes des joueurs
+`crates/world/src/lineup.rs` lit les 15 attributs de la table `player_attributes` (M2, note 007 :
+15/20 = joueur moyen de LEC, un écart-type = 2 points). En M3, seuls Farm et Mécanique jouent
+(derniers coups). KC et G2 étant au-dessus de la moyenne, leurs joueurs de voie farment un peu
+plus que la moyenne LEC du rapport.
 - Les tours extérieures n'ont pas encore de plaques distinctes ; aucun champion ne pousse sa vague.
 
 ## Déterminisme

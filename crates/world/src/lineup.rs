@@ -2,7 +2,8 @@
 //! leur champion et ses stats Data Dragon.
 //!
 //! En attendant la draft (M7), chaque joueur prend son champion le plus joué en 2025
-//! qui n'est pas déjà pris. En attendant les notes (M2), tous les attributs sont à la moyenne LEC.
+//! qui n'est pas déjà pris. Les attributs viennent des notes M2 (note 007) ; un attribut absent
+//! vaut la moyenne LEC.
 
 use mm_data::read::{Db, Team};
 use mm_engine::{Attributes, ChampionStats, PlayerSetup, Role, TeamSetup};
@@ -71,6 +72,36 @@ pub fn champion_stats(db: &Db, id: &str) -> Result<Option<ChampionStats>, Lineup
     }))
 }
 
+/// Clés des attributs dans la base (table `player_attributes`), dans l'ordre de `mm_engine::Attr`.
+const ATTR_KEYS: [&str; 15] = [
+    "mecanique",
+    "laning",
+    "farm",
+    "teamfight",
+    "escarmouche",
+    "lecture_carte",
+    "decision",
+    "vision",
+    "pool_champions",
+    "shotcalling",
+    "communication",
+    "sang_froid",
+    "regularite",
+    "grands_matchs",
+    "professionnalisme",
+];
+
+/// Les 15 attributs d'un joueur, lus dans la base.
+pub fn attributes(db: &Db, person_id: &str) -> Result<Attributes, LineupError> {
+    let mut attrs = Attributes::default();
+    for score in db.attributes(person_id)? {
+        if let Some(i) = ATTR_KEYS.iter().position(|k| *k == score.key) {
+            attrs.0[i] = score.value;
+        }
+    }
+    Ok(attrs)
+}
+
 fn spells(role: Role) -> [String; 2] {
     let second = match role {
         Role::Top | Role::Mid => "SummonerTeleport",
@@ -108,7 +139,7 @@ pub fn lineup(db: &Db, team: &Team, taken: &mut Vec<String>) -> Result<TeamSetup
             name: p.handle.clone(),
             role: *role,
             champion,
-            attrs: Attributes::default(),
+            attrs: attributes(db, &p.person_id)?,
             spells: spells(*role),
         });
     }
