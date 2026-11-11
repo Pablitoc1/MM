@@ -11,11 +11,13 @@
 
 [[league]]
 id = "LEC"
+oe = ["EU LCS"]
 name = "LoL EMEA Championship"
 tier = 1
 
 [[league]]
 id = "LCK"
+oe = ["OGN"]
 name = "LoL Champions Korea"
 tier = 1
 
@@ -28,7 +30,7 @@ tier = 1
 id = "LCS"
 name = "League of Legends Championship Series"
 tier = 1
-oe = ["LTA N"]
+oe = ["LTA N", "NA LCS"]
 
 [[league]]
 id = "CBLOL"
@@ -117,17 +119,19 @@ id = "LCKCL"
 academy_of = "LCK"
 name = "LCK Challengers League"
 tier = 2
-oe = ["LCKC"]
+oe = ["LCKC", "CK"]
 
 [[league]]
 id = "LDL"
 academy_of = "LPL"
+oe = ["LSPL"]
 name = "LoL Development League"
 tier = 2
 
 [[league]]
 id = "NACL"
 academy_of = "LCS"
+oe = ["NA CS", "LCSA"]
 name = "North American Challengers League"
 tier = 2
 
@@ -160,6 +164,7 @@ tier = 2
 
 [[league]]
 id = "PCS"
+oe = ["LMS"]
 name = "Pacific Championship Series"
 tier = 2
 

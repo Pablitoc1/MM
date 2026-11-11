@@ -95,7 +95,7 @@ CREATE TABLE league_strength (
 CREATE TABLE player_ratings (
     person_id  TEXT PRIMARY KEY REFERENCES people(id),
     role       TEXT NOT NULL,
-    games      INTEGER NOT NULL,          -- parties 2024-2025 prises en compte
+    games      INTEGER NOT NULL,          -- parties 2014-2025 prises en compte (au poste)
     level      REAL NOT NULL,
     level_low  REAL NOT NULL,
     level_high REAL NOT NULL,
