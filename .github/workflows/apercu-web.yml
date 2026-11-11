@@ -1,0 +1,52 @@
+# Lien de test : chaque PR publie une version web du jeu, sans rien installer.
+# Le lien est posté en commentaire de la PR, et retiré quand la PR est fermée.
+# La version de main est aussi publiée, à la racine du site.
+name: Lien de test web
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+  push:
+    branches: [main]
+
+concurrency:
+  group: apercu-web-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publier:
+    name: Publier la version web
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: github.event.action != 'closed'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Construire l'interface
+        if: github.event.action != 'closed'
+        # Chemins relatifs : le site vit dans un sous-dossier par PR.
+        run: cd app && npm ci && npm run build -- --base=./
+
+      - name: Publier le lien de la PR
+        if: github.event_name == 'pull_request'
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: app/dist
+          preview-branch: gh-pages
+          umbrella-dir: pr
+
+      - name: Publier la version de main
+        if: github.event_name == 'push'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: app/dist
+          branch: gh-pages
+          clean-exclude: pr/
+          force: false

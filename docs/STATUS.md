@@ -18,6 +18,8 @@ Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
 - Commandes Tauri `leagues`, `teams`, `roster` ; la base est livrée dans l'installateur.
 - Écran Effectif : n'importe quel club LEC, joueurs et staff réels, âge, champions, stats 2025, fin de contrat.
 - `just check`, `just seed`, `just demo M0|M1`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
+- Lien de test web sur chaque PR, et mise à jour automatique du jeu installé à chaque fusion
+  dans `main` (décision 008).
 
 ## Ce qui manque (prochain jalon)
 M2 · Notes des joueurs (attributs calculés à partir des stats).

@@ -6,6 +6,7 @@ import { NAV, type ScreenId } from './nav';
 import { Home } from './screens/Home';
 import { Placeholder } from './screens/Placeholder';
 import { Squad } from './screens/Squad';
+import { UpdateBanner } from './update/UpdateBanner';
 
 export function App() {
   const [world, setWorld] = useState<WorldInfo>(FALLBACK_WORLD);
@@ -19,6 +20,7 @@ export function App() {
 
   return (
     <div className="shell">
+      <UpdateBanner />
       <TopBar world={world} />
       <div className="body">
         <SideNav active={screen} onSelect={setScreen} />
