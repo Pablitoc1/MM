@@ -25,6 +25,12 @@
   --map-stone-light: #6b7488;
   --map-rubble: #4a5266;
   --map-kill: #e0614f;
+  --bar-hp: #4cc38a;          /* barre de vie des cartes joueurs */
+  --bar-mana: #5b8def;        /* barre de mana */
+  --drake-infernal: #f07a3a;
+  --drake-ocean: #4fa3e0;
+  --objective-void: #b48ce8;  /* larves et Nashor */
+  --item-slot: #121827;       /* case d'objet vide */
 
   /* Composants des maquettes v2 (jauges, tags, graphiques). */
   --text-soft: #c9d1df;     /* texte des messages */

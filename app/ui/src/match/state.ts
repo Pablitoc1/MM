@@ -8,9 +8,25 @@ export interface ChampionView extends ChampionInfo {
   x: number;
   y: number;
   hp: number;
+  resource: number | null;
   alive: boolean;
   /** Secondes avant la réapparition, si le champion est mort. */
   respawnIn: number | null;
+  level: number;
+  cs: number;
+  gold: number;
+  items: number[];
+  kills: number;
+  deaths: number;
+  assists: number;
+}
+
+/** Objectifs pris par une équipe. */
+export interface TeamObjectives {
+  /** Variantes des dragons pris, dans l'ordre (« Infernal », « Océan »…). */
+  dragons: string[];
+  grubs: number;
+  barons: number;
 }
 
 export interface WaveView { id: number; team: TeamIndex; lane: Lane; x: number; y: number; n: number }
@@ -43,6 +59,11 @@ export interface MatchState {
   /** Effets visibles à cet instant. */
   effects: Effect[];
   winner: TeamIndex | null;
+  /** Or total de chaque équipe. */
+  gold: [number, number];
+  objectives: [TeamObjectives, TeamObjectives];
+  /** Chances de victoire du côté bleu (0 à 1). */
+  blueWin: number;
 }
 
 /** Durées d'affichage des effets, en secondes. */
@@ -145,6 +166,11 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
   for (const camp of CAMPS) camps.set(camp.id, { camp, status: 'waiting', variant: null, respawnIn: null });
   const wards = new Map<number, WardView & { expiresAt: number }>();
   let winner: TeamIndex | null = null;
+  const kda = replay.champions.map(() => ({ kills: 0, deaths: 0, assists: 0 }));
+  const objectives: [TeamObjectives, TeamObjectives] = [
+    { dragons: [], grubs: 0, barons: 0 }, { dragons: [], grubs: 0, barons: 0 },
+  ];
+  const variantOf = new Map<string, string | undefined>();
 
   for (const e of replay.events) {
     if (e.t > time) break;
@@ -152,6 +178,9 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
       case 'kill': {
         kills[replay.champions[e.victim].team === 0 ? 1 : 0]++;
         respawnAt.set(e.victim, e.respawnAt);
+        kda[e.victim].deaths++;
+        if (e.killer !== null) kda[e.killer].kills++;
+        for (const a of e.assists) kda[a].assists++;
         break;
       }
       case 'structure': {
@@ -163,11 +192,16 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
       case 'camp_spawn': {
         const c = camps.get(e.camp);
         if (c) camps.set(e.camp, { ...c, status: 'alive', variant: e.variant ?? null, respawnIn: null });
+        variantOf.set(e.camp, e.variant);
         break;
       }
       case 'camp_killed': {
         const c = camps.get(e.camp);
         if (c) camps.set(e.camp, { ...c, status: 'dead', respawnIn: e.respawnAt === null ? null : e.respawnAt - time });
+        const variant = variantOf.get(e.camp);
+        if (e.camp === 'dragon') objectives[e.team].dragons.push(variant ?? 'Dragon');
+        if (e.camp === 'baron' && variant === GRUBS) objectives[e.team].grubs += GRUBS_PER_TAKE;
+        else if (e.camp === 'baron') objectives[e.team].barons++;
         break;
       }
       case 'ward_placed':
@@ -196,10 +230,16 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
     const until = respawnAt.get(idx);
     return {
       ...info,
+      ...kda[idx],
       index: idx,
       x: smooth ? lerp(ca.x, cb.x, k) : ca.x,
       y: smooth ? lerp(ca.y, cb.y, k) : ca.y,
       hp: smooth ? lerp(ca.hp, cb.hp, k) : ca.hp,
+      resource: ca.resource,
+      level: ca.level,
+      cs: ca.cs,
+      gold: ca.gold,
+      items: ca.items,
       alive,
       respawnIn: !alive && until !== undefined ? Math.max(0, until - time) : null,
     };
@@ -232,7 +272,25 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
     wards: [...wards.values()].filter((w) => w.expiresAt > time).map(({ id, team, x, y }) => ({ id, team, x, y })),
     effects: visible,
     winner,
+    gold: [0, 1].map((team) => champions.filter((c) => c.team === team).reduce((sum, c) => sum + c.gold, 0)) as [number, number],
+    objectives,
+    blueWin: lerp(a.blueWin, b.blueWin, k),
   };
+}
+
+/** Variante du camp du Nashor avant son apparition. */
+export const GRUBS = 'Larves du Néant';
+/** Larves tuées à chaque prise du camp (une vague de 3). */
+export const GRUBS_PER_TAKE = 3;
+
+/** Écart d'or (bleu moins rouge) à chaque minute jusqu'à `t`, pour la courbe. */
+export function goldDiffByMinute(replay: MatchReplay, t: number): number[] {
+  const out: number[] = [];
+  for (let m = 0; m * 60 <= t; m++) {
+    const f = replay.frames[frameIndex(replay.frames, m * 60)];
+    out.push(f.champions.reduce((sum, c, i) => sum + (replay.champions[i].team === 0 ? c.gold : -c.gold), 0));
+  }
+  return out;
 }
 
 /** « 18:42 » */

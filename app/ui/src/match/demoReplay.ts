@@ -46,16 +46,16 @@ const respawnDelay = (t: number) => 8 + (t / 60) * 1.25;
 const FOUNTAIN: [Point, Point] = [{ x: 560, y: 580 }, { x: 14200, y: 14270 }]; // estimé (minimap)
 
 const ROSTER: ChampionInfo[] = [
-  { team: 0, role: 'top', player: 'Canna', champion: 'Renekton' },
-  { team: 0, role: 'jungle', player: 'Yike', champion: 'XinZhao' },
-  { team: 0, role: 'mid', player: 'kyeahoo', champion: 'Orianna' },
-  { team: 0, role: 'bot', player: 'Caliste', champion: 'Varus' },
-  { team: 0, role: 'support', player: 'Busio', champion: 'Rakan' },
-  { team: 1, role: 'top', player: 'BrokenBlade', champion: 'Gnar' },
-  { team: 1, role: 'jungle', player: 'SkewMond', champion: 'Sejuani' },
-  { team: 1, role: 'mid', player: 'Caps', champion: 'Taliyah' },
-  { team: 1, role: 'bot', player: 'Hans Sama', champion: 'Ezreal' },
-  { team: 1, role: 'support', player: 'Labrov', champion: 'Braum' },
+  { team: 0, role: 'top', player: 'Canna', champion: 'Renekton', spells: ['SummonerFlash', 'SummonerTeleport'] },
+  { team: 0, role: 'jungle', player: 'Yike', champion: 'XinZhao', spells: ['SummonerFlash', 'SummonerSmite'] },
+  { team: 0, role: 'mid', player: 'kyeahoo', champion: 'Orianna', spells: ['SummonerFlash', 'SummonerTeleport'] },
+  { team: 0, role: 'bot', player: 'Caliste', champion: 'Varus', spells: ['SummonerFlash', 'SummonerHeal'] },
+  { team: 0, role: 'support', player: 'Busio', champion: 'Rakan', spells: ['SummonerFlash', 'SummonerExhaust'] },
+  { team: 1, role: 'top', player: 'BrokenBlade', champion: 'Gnar', spells: ['SummonerFlash', 'SummonerTeleport'] },
+  { team: 1, role: 'jungle', player: 'SkewMond', champion: 'Sejuani', spells: ['SummonerFlash', 'SummonerSmite'] },
+  { team: 1, role: 'mid', player: 'Caps', champion: 'Taliyah', spells: ['SummonerFlash', 'SummonerTeleport'] },
+  { team: 1, role: 'bot', player: 'Hans Sama', champion: 'Ezreal', spells: ['SummonerFlash', 'SummonerHeal'] },
+  { team: 1, role: 'support', player: 'Labrov', champion: 'Braum', spells: ['SummonerFlash', 'SummonerExhaust'] },
 ];
 
 const LANE_OF: Record<Role, Lane | null> = { top: 'top', mid: 'mid', bot: 'bot', support: 'bot', jungle: null };
@@ -133,15 +133,15 @@ const STRUCTURE_KILLS: { t: number; id: string; team: TeamIndex }[] = [
 /** Objectifs neutres : apparitions et prises. */
 const OBJECTIVES: MatchEvent[] = [
   { t: 300, type: 'camp_spawn', camp: 'dragon', variant: 'Infernal' },
-  { t: 342, type: 'camp_killed', camp: 'dragon', team: 0, respawnAt: 642 },
+  { t: 342, type: 'camp_killed', camp: 'dragon', team: 0, respawnAt: 642, by: 1 },
   { t: 480, type: 'camp_spawn', camp: 'baron', variant: 'Larves du Néant' },
-  { t: 528, type: 'camp_killed', camp: 'baron', team: 1, respawnAt: 1200 },
+  { t: 528, type: 'camp_killed', camp: 'baron', team: 1, respawnAt: 1200, by: 6 },
   { t: 642, type: 'camp_spawn', camp: 'dragon', variant: 'Océan' },
-  { t: 700, type: 'camp_killed', camp: 'dragon', team: 1, respawnAt: 1000 },
+  { t: 700, type: 'camp_killed', camp: 'dragon', team: 1, respawnAt: 1000, by: 6 },
   { t: 1000, type: 'camp_spawn', camp: 'dragon', variant: 'Infernal' },
-  { t: 1040, type: 'camp_killed', camp: 'dragon', team: 0, respawnAt: 1340 },
+  { t: 1040, type: 'camp_killed', camp: 'dragon', team: 0, respawnAt: 1340, by: 1 },
   { t: 1200, type: 'camp_spawn', camp: 'baron', variant: 'Nashor' },
-  { t: 1228, type: 'camp_killed', camp: 'baron', team: 0, respawnAt: 1588 },
+  { t: 1228, type: 'camp_killed', camp: 'baron', team: 0, respawnAt: 1588, by: 1 },
   { t: 1340, type: 'camp_spawn', camp: 'dragon', variant: 'Infernal' },
 ];
 
@@ -168,6 +168,46 @@ const WARD_SPOTS: [Point[], Point[]] = [
   [pct(45, 47), pct(30, 40), pct(62, 55), pct(52, 82), pct(36, 28), pct(68, 62)],
   [pct(60, 32), pct(78, 52), pct(40, 20), pct(70, 80), pct(55, 40), pct(32, 45)],
 ];
+
+// ---------------------------------------------------------------- Économie (démonstration, estimé)
+
+/** Objets achetés dans l'ordre : [identifiant Data Dragon 16.1, coût]. Le premier est l'objet de départ. */
+const BUILDS: Record<string, [number, number][]> = {
+  Renekton: [[1055, 450], [3047, 1200], [6610, 3100], [3053, 3200], [6333, 3300], [3071, 3000]],
+  XinZhao: [[1101, 450], [3047, 1200], [6631, 3300], [3071, 3000], [3053, 3200], [6333, 3300]],
+  Orianna: [[1056, 400], [3020, 1100], [6655, 2750], [4645, 3200], [3157, 3250], [3089, 3500]],
+  Varus: [[1055, 450], [3006, 1100], [3032, 3100], [3031, 3500], [3036, 3300], [3046, 2650]],
+  Rakan: [[3870, 400], [3117, 1000], [3190, 2200], [3050, 2200], [3109, 2300], [3065, 2700]],
+  Gnar: [[1054, 450], [3047, 1200], [3078, 3333], [3053, 3200], [6333, 3300], [3748, 3300]],
+  Sejuani: [[1102, 450], [3111, 1250], [6665, 3200], [3068, 2700], [3075, 2450], [3143, 2700]],
+  Taliyah: [[1056, 400], [3020, 1100], [2503, 2800], [4645, 3200], [3157, 3250], [3135, 3000]],
+  Ezreal: [[1055, 450], [3158, 900], [3004, 2900], [3078, 3333], [6694, 3000], [3033, 3000]],
+  Braum: [[3876, 400], [3111, 1250], [3190, 2200], [3109, 2300], [2504, 2900], [3075, 2450]],
+};
+
+const START_GOLD = 500;
+/** Or et CS par minute de jeu en vie, selon le rôle. */
+const INCOME: Record<Role, number> = { top: 330, jungle: 320, mid: 360, bot: 380, support: 220 };
+const CS_RATE: Record<Role, number> = { top: 7.8, jungle: 6.2, mid: 8.4, bot: 9, support: 1.1 };
+const LEVEL_OFFSET: Record<Role, number> = { top: 0, jungle: -0.5, mid: 0.3, bot: -0.3, support: -1.5 };
+const NO_RESOURCE = new Set(['Renekton', 'Gnar']);
+const KILL_GOLD = 300;
+const ASSIST_GOLD = 150;
+const TOWER_GOLD_TEAM = 100;
+const BARON_GOLD_TEAM = 300;
+
+function itemsFor(champion: string, gold: number): number[] {
+  const build = BUILDS[champion] ?? [];
+  let left = gold;
+  const bought: number[] = [];
+  for (const [id, cost] of build) {
+    if (left < cost) break;
+    left -= cost;
+    bought.push(id);
+  }
+  // L'objet de départ est revendu quand l'inventaire se remplit.
+  return bought.length >= 5 ? bought.slice(1) : bought;
+}
 
 // ---------------------------------------------------------------- Génération
 
@@ -230,7 +270,7 @@ export function buildDemoReplay(): MatchReplay {
       const ready = campReady.get(id)!;
       const done = Math.max(arrive, ready) + (camp.kind === 'scuttle' ? 12 : 18);
       const delay = camp.kind === 'scuttle' ? RESPAWN_SCUTTLE : camp.kind === 'blue' || camp.kind === 'red' ? RESPAWN_BUFF : RESPAWN_SMALL_CAMP;
-      events.push({ t: done, type: 'camp_killed', camp: id, team, respawnAt: done + delay });
+      events.push({ t: done, type: 'camp_killed', camp: id, team, respawnAt: done + delay, by: Number(jg) });
       events.push({ t: done + delay, type: 'camp_spawn', camp: id });
       campReady.set(id, done + delay);
     }
@@ -257,6 +297,7 @@ export function buildDemoReplay(): MatchReplay {
   const nextDeath = (i: number, t: number) => (deathUntil.get(i) ?? []).find(([a]) => a >= t)?.[0];
   const wasDead = ROSTER.map(() => false);
   const phase = ROSTER.map(() => rand() * Math.PI * 2);
+  const aliveFarm = ROSTER.map(() => 0);
 
   const destroyedAt = (t: number) => new Set(STRUCTURE_KILLS.filter((s) => s.t <= t).map((s) => s.id));
 
@@ -340,20 +381,39 @@ export function buildDemoReplay(): MatchReplay {
     }
     waves = waves.filter((w) => w.n > 0);
 
+    for (let i = 0; i < ROSTER.length; i++) if (!isDead(i, t) && t >= CAMP_FIRST_SPAWN) aliveFarm[i] += dt;
+
     const emit = Math.abs(t - Math.round(t)) < 1e-9 || fightAt(t);
     if (emit) {
-      const champions: ChampionFrame[] = ROSTER.map((_, i) => ({
-        x: Math.round(pos[i].x), y: Math.round(pos[i].y), hp: Math.round(hp[i] * 100) / 100, alive: !isDead(i, t),
-      }));
+      const champions: ChampionFrame[] = ROSTER.map((c, i) => {
+        const kills = KILLS.filter((k) => k.t <= t && k.killer === i).length;
+        const assists = KILLS.filter((k) => k.t <= t && k.assists.includes(i)).length;
+        const towers = STRUCTURE_KILLS.filter((st) => st.t <= t && st.team === c.team).length;
+        const barons = OBJECTIVES.filter((o) => o.t <= t && o.type === 'camp_killed' && o.camp === 'baron' && o.team === c.team && o.t > 1000).length;
+        const gold = Math.round(START_GOLD + (INCOME[c.role] * aliveFarm[i]) / 60 + KILL_GOLD * kills + ASSIST_GOLD * assists
+          + TOWER_GOLD_TEAM * towers + BARON_GOLD_TEAM * barons);
+        const level = Math.max(1, Math.min(18, Math.floor(1 + 17 * Math.pow(t / 2100, 0.75) + LEVEL_OFFSET[c.role] + 0.25 * kills)));
+        const resource = NO_RESOURCE.has(c.champion) ? null
+          : Math.round((0.35 + 0.6 * (0.5 + 0.5 * Math.sin(t / 23 + phase[i]))) * 100) / 100;
+        return {
+          x: Math.round(pos[i].x), y: Math.round(pos[i].y), hp: Math.round(hp[i] * 100) / 100, resource,
+          alive: !isDead(i, t), level, cs: Math.floor((CS_RATE[c.role] * aliveFarm[i]) / 60), gold,
+          items: itemsFor(c.champion, gold),
+        };
+      });
+      const goldDiff = champions.reduce((a, ch, i) => a + (ROSTER[i].team === 0 ? ch.gold : -ch.gold), 0);
+      const towerDiff = STRUCTURE_KILLS.filter((st) => st.t <= t).reduce((a, st) => a + (st.team === 0 ? 1 : -1), 0);
+      const ended = t >= 1440;
+      const blueWin = ended ? 1 : 1 / (1 + Math.exp(-(goldDiff / 4000 + 0.15 * towerDiff)));
       const waveFrames: WaveFrame[] = waves.map((w) => ({ id: w.id, team: w.team, lane: w.lane, d: Math.round(w.d), n: w.n }));
-      frames.push({ t, champions, waves: waveFrames });
+      frames.push({ t, blueWin: Math.round(blueWin * 1000) / 1000, champions, waves: waveFrames });
     }
   }
 
   return {
     version: REPLAY_VERSION,
     map: 'summoners-rift',
-    patch: '16.22',
+    patch: '26.1',
     seed: SEED,
     duration: DURATION,
     teams: [{ tag: 'KC', name: 'Karmine Corp' }, { tag: 'G2', name: 'G2 Esports' }],

@@ -18,6 +18,16 @@ Défini dans `app/ui/src/match/replay.ts`. Le moteur Rust devra produire exactem
 - Positions en unités de jeu Riot (carte 11, origine en bas à gauche côté bleu), comme les
   timelines de l'API Riot : on pourra comparer le moteur à de vraies parties.
 
+## Ajouts pour l'écran complet (deuxième PR)
+- Champion : ses 2 sorts d'invocateur (en-tête) ; à chaque image, ressource (mana ou énergie,
+  `null` pour un champion sans ressource), niveau, cs, or gagné et objets possédés (ids Data Dragon).
+- Image : `blueWin`, les chances de victoire du côté bleu, que le moteur calculera.
+- Camp tué : `by`, le champion qui donne le dernier coup, pour le fil du match.
+- La vue en déduit seule : KDA, or par équipe, dragons, larves et Nashor pris, courbe d'écart d'or,
+  fil du match (kills d'un teamfight regroupés dans un bloc, comme sur la maquette).
+- L'économie du faux match (achats, revenus, cs, chances de victoire) est marquée `// estimé` :
+  le moteur M3 la remplacera.
+
 ## Ce que fait la vue, et ce qu'elle ne fait pas
 - Elle interpole linéairement entre deux images ; elle ne connaît aucune règle du jeu.
   Les timers (réapparitions, camps) viennent tous du flux.
@@ -34,7 +44,9 @@ l'image ; marqués `// estimé`.
 ## Images
 `app/ui/src/match/assets/` : minimap Data Dragon 16.22.1, icônes des camps
 et des sbires reprises de la maquette v2. Les icônes de champions viennent de la base
-de départ (M1, `data/seed/public/champions`).
+de départ (M1, `data/seed/public/champions`). L'import Data Dragon télécharge en plus
+les icônes des objets (ceux de la carte 11) et des sorts d'invocateur, dans `items/` et `spells/`.
+Icône du drake océan reprise de la maquette v2.
 
 ## Nouvelle dépendance
 PixiJS 8 (rendu 2D WebGL), prévu dans la stack (note 001). Chargé seulement sur l'écran du match.

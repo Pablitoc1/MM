@@ -5,7 +5,7 @@ import {
 } from 'pixi.js';
 import { ALCOVES, CAMPS, STRUCTURES, toUnit, type CampKind, type Point } from './map';
 import type { MatchReplay, TeamIndex } from './replay';
-import { championIcon } from '../api';
+import { championIcon, localAsset } from './icons';
 import { formatClock, type CampView, type MatchState } from './state';
 
 /** Couleurs lues dans tokens.css au démarrage (Pixi ne lit pas le CSS lui-même). */
@@ -29,9 +29,6 @@ function readPalette(): Palette {
   return { ...out, team: [out.us, out.them] };
 }
 
-/** Images livrées avec la vue (minimap, camps, sbires), servies par Vite. */
-const LOCAL = import.meta.glob('./assets/**/*.{png,webp}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-
 const CAMP_ICON: Record<CampKind, string> = {
   blue: 'blue', red: 'red', gromp: 'gromp', wolves: 'wolves', raptors: 'raptors',
   krugs: 'krugs', scuttle: 'scuttle', dragon: 'dragon', baron: 'baron',
@@ -40,9 +37,7 @@ const CAMP_ICON: Record<CampKind, string> = {
 /** Adresse d'une image : icônes de champions de la base (M1), le reste livré avec la vue. */
 function urlOf(path: string): string {
   if (path.startsWith('champions/')) return championIcon(path.slice('champions/'.length, -'.png'.length));
-  const url = LOCAL[`./assets/${path}`];
-  if (!url) throw new Error(`image manquante : ${path}`);
-  return url;
+  return localAsset(path);
 }
 
 export function assetPaths(replay: MatchReplay): string[] {

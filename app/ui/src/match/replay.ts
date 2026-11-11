@@ -27,6 +27,8 @@ export interface ChampionInfo {
   player: string;
   /** Identifiant Data Dragon du champion, ex. « XinZhao ». */
   champion: string;
+  /** Sorts d'invocateur (identifiants Data Dragon, ex. « SummonerFlash »). */
+  spells: [string, string];
 }
 
 /** État d'un champion dans une image. L'ordre suit `MatchReplay.champions`. */
@@ -35,7 +37,16 @@ export interface ChampionFrame {
   y: number;
   /** Points de vie, de 0 à 1. */
   hp: number;
+  /** Mana ou énergie, de 0 à 1 ; null pour un champion sans ressource à afficher. */
+  resource: number | null;
   alive: boolean;
+  level: number;
+  /** Sbires et monstres tués. */
+  cs: number;
+  /** Or total gagné depuis le début. */
+  gold: number;
+  /** Objets portés (identifiants Data Dragon), 6 au plus, sans la balise. */
+  items: number[];
 }
 
 /**
@@ -56,6 +67,8 @@ export interface WaveFrame {
 /** Une image horodatée : 1 par seconde, 4 par seconde en combat. */
 export interface Frame {
   t: number;
+  /** Chances de victoire du côté bleu, de 0 à 1, selon le moteur. */
+  blueWin: number;
   champions: ChampionFrame[];
   waves: WaveFrame[];
 }
@@ -64,7 +77,7 @@ export type MatchEvent =
   | { t: number; type: 'kill'; killer: number | null; victim: number; assists: number[]; respawnAt: number }
   | { t: number; type: 'structure'; id: string; team: TeamIndex }
   | { t: number; type: 'camp_spawn'; camp: string; variant?: string }
-  | { t: number; type: 'camp_killed'; camp: string; team: TeamIndex; respawnAt: number | null }
+  | { t: number; type: 'camp_killed'; camp: string; team: TeamIndex; respawnAt: number | null; by?: number }
   | { t: number; type: 'ward_placed'; id: number; team: TeamIndex; x: number; y: number; expiresAt: number }
   | { t: number; type: 'ward_killed'; id: number }
   | { t: number; type: 'end'; winner: TeamIndex };

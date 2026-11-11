@@ -22,6 +22,8 @@ Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
 ## En parallèle (préparation de M6, hors plan)
 Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
 (note 003), captures dans `docs/demo/vue-2d/` (`just demo vue-2d`). Le plan ne change pas.
+Écran complet autour de la carte (tableau de score, cartes des 10 joueurs, courbe d'or, fil du match),
+monté sur les composants d'interface préparés à part.
 
 ## Ce qui manque (prochain jalon)
 M2 · Notes des joueurs (attributs calculés à partir des stats).
