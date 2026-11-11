@@ -3,6 +3,8 @@
 pub mod date;
 pub mod lineup;
 
+pub use mm_engine;
+
 pub use date::GameDate;
 
 /// Résumé de l'état du jeu affiché par l'interface en M0.

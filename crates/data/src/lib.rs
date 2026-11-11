@@ -3,13 +3,17 @@
 //! La base de départ (`data/seed/world.sqlite`) est fabriquée par `just seed`
 //! (feature `import`) puis livrée avec l'application, qui la lit en lecture seule.
 
+pub mod ratings;
 pub mod read;
 pub mod schema;
 
 #[cfg(feature = "import")]
 pub mod import;
 
-pub use read::{Db, League, RosterMember, SeasonStats, Team};
+pub use read::{
+    AttrScore, ChampionUse, Db, League, PlayerDetail, Rating, RosterMember, SeasonStats, Team,
+    TournamentStats,
+};
 pub use schema::SCHEMA_VERSION;
 // Pour que l'application manipule les erreurs sans dépendre directement de rusqlite.
 pub use rusqlite;

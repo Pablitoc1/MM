@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use mm_data::read::Db;
 use mm_engine::sim::{simulate, MatchSetup, Snapshot};
-use mm_world::lineup::lineup;
+use mm_world::lineup::lec_match;
 
 const ROLES: [&str; 5] = ["top", "jungle", "mid", "bot", "support"];
 const ROLE_FR: [&str; 5] = ["Haut", "Jungle", "Milieu", "Bas", "Support"];
@@ -65,29 +65,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reference: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(
         root.join("data/reference/lec-2025.json"),
     )?)?;
-    let lec = db.teams("LEC")?;
-    let find = |tag: &str| {
-        lec.iter()
-            .find(|t| {
-                t.short
-                    .as_deref()
-                    .is_some_and(|s| s.eq_ignore_ascii_case(tag))
-                    || t.id == tag
-            })
-            .ok_or_else(|| format!("club LEC introuvable : {tag}"))
-    };
-    let (blue, red) = (find(&a.teams[0])?, find(&a.teams[1])?);
-    let mut taken = Vec::new();
-    let teams = [
-        lineup(&db, blue, &mut taken)?,
-        lineup(&db, red, &mut taken)?,
-    ];
+    let base = lec_match(&db, &a.teams[0], &a.teams[1], a.seed, a.minutes)?;
+    let teams = base.teams.clone();
     let setup = |seed| MatchSetup {
         seed,
-        patch: "26.1".into(),
         teams: teams.clone(),
-        duration: a.minutes * 60.0,
-        context: None,
+        patch: base.patch.clone(),
+        duration: base.duration,
+        context: base.context.clone(),
     };
 
     // Les 10 joueurs × les parties : instantanés à 10 et 15 minutes.

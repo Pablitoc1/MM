@@ -118,3 +118,41 @@ pub fn lineup(db: &Db, team: &Team, taken: &mut Vec<String>) -> Result<TeamSetup
         players,
     })
 }
+
+/// Un match entre deux clubs de LEC, désignés par leur sigle (ex. « KC », « G2 »).
+pub fn lec_match(
+    db: &Db,
+    blue: &str,
+    red: &str,
+    seed: u64,
+    minutes: f64,
+) -> Result<mm_engine::MatchSetup, LineupError> {
+    let lec = db.teams("LEC")?;
+    let find = |tag: &str| {
+        lec.iter()
+            .find(|t| {
+                t.short
+                    .as_deref()
+                    .is_some_and(|s| s.eq_ignore_ascii_case(tag))
+                    || t.id == tag
+            })
+            .ok_or_else(|| LineupError::MissingRole(tag.into(), "club"))
+    };
+    let mut taken = Vec::new();
+    let teams = [
+        lineup(db, find(blue)?, &mut taken)?,
+        lineup(db, find(red)?, &mut taken)?,
+    ];
+    Ok(mm_engine::MatchSetup {
+        seed,
+        patch: "26.1".into(),
+        teams,
+        duration: minutes * 60.0,
+        context: Some(mm_engine::replay::MatchContext {
+            competition: "LEC Versus".into(),
+            stage: "Partie simulée".into(),
+            format: "Bo1".into(),
+            date: "2026-01-17".into(),
+        }),
+    })
+}

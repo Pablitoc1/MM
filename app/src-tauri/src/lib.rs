@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use mm_data::{Db, League, RosterMember, Team};
+use mm_data::{Db, League, PlayerDetail, RosterMember, Team};
 use serde::Serialize;
 use tauri::{Manager, State};
 
@@ -56,6 +56,25 @@ fn roster(seed: State<Seed>, team_id: String) -> Result<Vec<RosterMember>, Strin
     with_db(&seed, |db| db.roster(&team_id))
 }
 
+#[tauri::command]
+fn player(seed: State<Seed>, person_id: String) -> Result<Option<PlayerDetail>, String> {
+    with_db(&seed, |db| db.player(&person_id))
+}
+
+/// Simule une partie entre deux clubs de LEC et renvoie son flux pour la vue 2D (M3 : 15 min de farm).
+#[tauri::command]
+fn simulate_match(
+    seed: State<Seed>,
+    blue: String,
+    red: String,
+    match_seed: u64,
+) -> Result<mm_world::mm_engine::Replay, String> {
+    let db = seed.0.lock().map_err(|e| e.to_string())?;
+    let setup = mm_world::lineup::lec_match(&db, &blue, &red, match_seed, 15.0)
+        .map_err(|e| e.to_string())?;
+    Ok(mm_world::mm_engine::simulate(&setup).replay)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -65,7 +84,14 @@ pub fn run() {
             app.manage(Seed(Mutex::new(db)));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![world_info, leagues, teams, roster])
+        .invoke_handler(tauri::generate_handler![
+            world_info,
+            leagues,
+            teams,
+            roster,
+            player,
+            simulate_match
+        ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application");
 }

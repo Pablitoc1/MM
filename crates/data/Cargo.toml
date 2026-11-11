@@ -10,7 +10,7 @@ workspace = true
 
 [features]
 # L'import (réseau, téléchargements) n'est compilé que pour `just seed`.
-import = ["dep:ureq", "dep:serde_json", "dep:toml", "dep:md5"]
+import = ["dep:ureq", "dep:serde_json", "dep:toml", "dep:md5", "dep:csv"]
 
 [dependencies]
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -18,6 +18,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 toml = { version = "0.8", optional = true }
 md5 = { version = "0.7", optional = true }
+csv = { version = "1", optional = true }
 ureq = { version = "2", optional = true, features = ["json", "native-certs"] }
 
 [[bin]]

@@ -2,6 +2,7 @@
 // viennent de `apercu.json`, un extrait de la base produit par `just seed`
 // avec les mêmes fonctions de lecture que l'application.
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import type { MatchReplay } from './match/replay';
 
 export interface WorldInfo {
   date: string;
@@ -92,6 +93,18 @@ export async function listLeagues(): Promise<League[]> {
 export async function listTeams(leagueId: string): Promise<Team[]> {
   if (isTauri()) return invoke<Team[]>('teams', { leagueId });
   return (await loadPreview()).teams.filter((t) => t.leagueId === leagueId);
+}
+
+/**
+ * Une partie simulée par le moteur (M3 : 15 min de farm, sans combat).
+ * Dans l'app : simulée à la demande. Dans le navigateur : la partie KC–G2 graine 1,
+ * produite par le même moteur (`just sim KC G2 --n 1 --replay data/seed/public/match-demo.json`).
+ */
+export async function simulateMatch(blue: string, red: string, matchSeed: number): Promise<MatchReplay> {
+  if (isTauri()) return invoke<MatchReplay>('simulate_match', { blue, red, matchSeed });
+  const r = await fetch(assetUrl('match-demo.json'));
+  if (!r.ok) throw new Error(`match-demo.json : ${r.status}`);
+  return r.json() as Promise<MatchReplay>;
 }
 
 export async function getRoster(teamId: string): Promise<RosterMember[]> {
