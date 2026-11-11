@@ -8,6 +8,7 @@ import { MatchLive } from './screens/MatchLive';
 import { Placeholder } from './screens/Placeholder';
 import { Player } from './screens/Player';
 import { DEFAULT_TEAM, Squad } from './screens/Squad';
+import { UpdateBanner } from './update/UpdateBanner';
 
 export function App() {
   const [world, setWorld] = useState<WorldInfo>(FALLBACK_WORLD);
@@ -26,6 +27,7 @@ export function App() {
 
   return (
     <div className="shell">
+      <UpdateBanner />
       <TopBar world={world} />
       <div className="body">
         <SideNav active={screen} onSelect={(s) => { setScreen(s); setPlayerId(null); }} />
