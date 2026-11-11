@@ -152,3 +152,4 @@
 .btn:hover { background: var(--bg-active); }
 .btn--on { border-color: var(--team-us); background: var(--bg-active); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.match-loading { display: grid; place-items: center; min-height: 100vh; background: var(--bg-page); color: var(--text-muted); font-size: 14px; }

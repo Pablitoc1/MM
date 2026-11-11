@@ -2,6 +2,9 @@
 
 pub mod date;
 pub mod draft;
+pub mod lineup;
+
+pub use mm_engine;
 
 pub use date::GameDate;
 

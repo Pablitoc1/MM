@@ -3,7 +3,7 @@
 //!
 //! La draft rend, pour chaque côté, 5 [`Pick`] (rôle, joueur, champion) que le moteur
 //! lit pour monter le match. Tout aléatoire passe par `SimRng` : la même graine donne
-//! la même draft. Voir `docs/decisions/010-regles-de-draft.md`.
+//! la même draft. Voir `docs/decisions/011-regles-de-draft.md`.
 
 pub mod knowledge;
 pub mod styles;

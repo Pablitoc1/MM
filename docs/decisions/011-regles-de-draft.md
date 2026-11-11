@@ -1,7 +1,7 @@
-# 010 · Règles de la draft et connaissance du patch
+# 011 · Règles de la draft et connaissance du patch
 
 Date : 11 novembre 2026. Partie draft du jalon M7 (suite de la note 008).
-L'IA de draft, qui s'appuie sur ces règles et cette connaissance, fait l'objet de la note 011.
+L'IA de draft, qui s'appuie sur ces règles et cette connaissance, fait l'objet de la note 012.
 
 ## Règles (`crates/world/src/draft/mod.rs`)
 - Ordre officiel des tournois : bans B R B R B R, picks B R R B B R, bans R B R B,

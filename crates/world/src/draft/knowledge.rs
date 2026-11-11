@@ -31,7 +31,7 @@ pub struct ChampInfo {
 
 impl ChampInfo {
     /// Force sur le patch, de 0 (jamais vu) à environ 1,5 (présent dans toutes les
-    /// parties et gagnant). // estimé (poids réglés sur la LEC 2025, voir la note 011)
+    /// parties et gagnant). // estimé (poids réglés sur la LEC 2025, voir la note 012)
     pub fn power(&self) -> f64 {
         let tier = match self.tier {
             Some('A') => 1.0,
