@@ -9,7 +9,7 @@ Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novemb
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
 - Générateur déterministe `SimRng` (moteur) et date du jeu `GameDate` (monde).
-- Base de départ `data/seed/world.sqlite` (schéma v1), reconstruite par `just seed` :
+- Base de départ `data/seed/world.sqlite` (schéma v3), reconstruite par `just seed` :
   - 42 ligues tier 1 à 3 (liste dans `data/leagues.toml`), 377 clubs, 2 562 joueurs et membres du staff
     avec pays, date de naissance et fin de contrat (Leaguepedia) ;
   - stats pro 2025 par joueur et par tournoi, et champions joués (Leaguepedia) ;
@@ -26,6 +26,11 @@ Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novemb
 - `just check`, `just seed`, `just demo M0|M1|M2`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
 - Lien de test web sur chaque PR, et mise à jour automatique du jeu installé à chaque fusion
   dans `main` (décision 009).
+
+## En parallèle : la draft (partie draft de M7, en avance, accord de Yahia)
+Fil « Construire la draft ». Fait : données (PR #18, note 008), règles et connaissance du patch
+(note 011). La saison 2026 suit la vraie méta de chaque patch ; à partir de 2027, patches
+générés (M9). À venir : IA de draft (note 012), puis écran Draft branché.
 
 ## En parallèle (préparation de M6, hors plan)
 Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
