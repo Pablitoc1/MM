@@ -1,20 +1,30 @@
-// Effectif (M1) : les vrais joueurs et le staff d'un club, au 5 janvier 2026.
-// Niveau, forme, moral et valeur arrivent avec les jalons de gestion.
+// Effectif : les vrais joueurs et le staff d'un club, au 5 janvier 2026, avec leur niveau
+// (M2). Forme, moral et valeur arrivent avec les jalons de gestion.
 import { useEffect, useMemo, useState } from 'react';
 import { assetUrl, championIcon, getRoster, listTeams, type RosterMember, type Team } from '../api';
 import { ROLE_LABEL, RoleIcon } from '../components/RoleIcon';
 import { ageAt, countryFr, fmt0, fmt1, kda, monthYear } from '../format';
+import { scoreText } from '../ratings';
 
 /** Date de début de partie, pour l'âge. */
 const GAME_START = '2026-01-05';
-const DEFAULT_TEAM = 'Karmine Corp';
+export const DEFAULT_TEAM = 'Karmine Corp';
 const LEAGUE = 'LEC';
 
 type Tab = 'joueurs' | 'staff';
 
-export function Squad() {
+interface Props {
+  /** Club affiché ; gardé par l'application pour revenir au même club après une fiche. */
+  teamId?: string;
+  onTeamChange?: (teamId: string) => void;
+  onOpenPlayer?: (personId: string) => void;
+}
+
+export function Squad({ teamId: shownTeam, onTeamChange, onOpenPlayer }: Props) {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [teamId, setTeamId] = useState(DEFAULT_TEAM);
+  const [ownTeam, setOwnTeam] = useState(DEFAULT_TEAM);
+  const teamId = shownTeam ?? ownTeam;
+  const setTeamId = (id: string) => (onTeamChange ? onTeamChange(id) : setOwnTeam(id));
   const [loaded, setLoaded] = useState<{ teamId: string; members: RosterMember[] } | null>(null);
   const [tab, setTab] = useState<Tab>('joueurs');
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +75,10 @@ export function Squad() {
       </div>
 
       <section className="card card--table" aria-busy={roster === null}>
-        {tab === 'joueurs' ? <PlayersTable players={players} /> : <StaffTable staff={staff} />}
+        {tab === 'joueurs' ? <PlayersTable players={players} onOpen={onOpenPlayer} /> : <StaffTable staff={staff} />}
       </section>
       <p className="note">
-        Effectif de départ et contrats : Leaguepedia. Stats : matchs pro 2025 (tous tournois). Le niveau, la forme et la valeur arrivent aux jalons suivants.
+        Effectif de départ et contrats : Leaguepedia. Stats : matchs pro 2025 (tous tournois). Niveau sur 100, calculé sur les parties 2024-2025 (Oracle's Elixir) : une fourchette signale une note incertaine. Clique sur un joueur pour sa fiche.
       </p>
     </>
   );
@@ -100,9 +110,9 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: s
   );
 }
 
-function Person({ m }: { m: RosterMember }) {
+function Person({ m, onOpen }: { m: RosterMember; onOpen?: (personId: string) => void }) {
   const country = countryFr(m.country);
-  return (
+  const body = (
     <div className="person">
       {m.photoFile
         ? <img className="person__photo" src={assetUrl(m.photoFile)} alt="" width={40} height={40} />
@@ -113,14 +123,26 @@ function Person({ m }: { m: RosterMember }) {
       </div>
     </div>
   );
+  if (!onOpen) return body;
+  return (
+    <button type="button" className="linklike" onClick={() => onOpen(m.personId)} aria-label={`Fiche de ${m.handle}`}>
+      {body}
+    </button>
+  );
 }
 
-function PlayersTable({ players }: { players: RosterMember[] }) {
+function Level({ m }: { m: RosterMember }) {
+  const r = m.rating;
+  if (!r) return <span className="muted">–</span>;
+  return <strong className="level">{scoreText({ value: r.level, low: r.levelLow, high: r.levelHigh }, 100)}</strong>;
+}
+
+function PlayersTable({ players, onOpen }: { players: RosterMember[]; onOpen?: (personId: string) => void }) {
   return (
     <table className="table">
       <thead>
         <tr>
-          <th>Poste</th><th>Joueur</th><th>Âge</th><th>Champions 2025</th>
+          <th>Poste</th><th>Joueur</th><th className="num">Niveau</th><th className="num">Potentiel</th><th>Âge</th><th>Champions 2025</th>
           <th className="num">Matchs</th><th className="num">Victoires</th><th className="num">KDA</th>
           <th className="num">CS/min</th><th className="num">Dégâts/min</th><th>Fin de contrat</th>
         </tr>
@@ -131,7 +153,9 @@ function PlayersTable({ players }: { players: RosterMember[] }) {
           return (
             <tr key={`${m.personId}-${m.role}`}>
               <td><span className="role">{<RoleIcon role={m.role} />}</span></td>
-              <td><Person m={m} /></td>
+              <td><Person m={m} onOpen={onOpen} /></td>
+              <td className="num"><Level m={m} /></td>
+              <td className="num">{m.rating ? Math.round(m.rating.potential) : '–'}</td>
               <td>{ageAt(m.birthdate, GAME_START) ?? '–'}</td>
               <td>
                 <div className="champs">
