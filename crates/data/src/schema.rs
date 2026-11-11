@@ -4,7 +4,7 @@
 use rusqlite::Connection;
 
 /// Version du schéma de la base. Augmente à chaque migration.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 const V1: &str = r#"
 CREATE TABLE meta (
@@ -82,6 +82,36 @@ CREATE TABLE player_champions_2025 (
     games     INTEGER NOT NULL,
     wins      INTEGER NOT NULL,
     PRIMARY KEY (person_id, champion)
+);
+
+-- Niveau des ligues, en écarts-types par rapport à la LEC (voir docs/decisions/007).
+CREATE TABLE league_strength (
+    league_id TEXT PRIMARY KEY,
+    offset    REAL NOT NULL,
+    source    TEXT NOT NULL
+);
+
+-- Notes calculées (M2). Niveau et potentiel sur 100 ; source : stats ou estimé.
+CREATE TABLE player_ratings (
+    person_id  TEXT PRIMARY KEY REFERENCES people(id),
+    role       TEXT NOT NULL,
+    games      INTEGER NOT NULL,          -- parties 2014-2025 prises en compte (au poste)
+    level      REAL NOT NULL,
+    level_low  REAL NOT NULL,
+    level_high REAL NOT NULL,
+    potential  REAL NOT NULL,
+    source     TEXT NOT NULL
+);
+
+-- Attributs sur 20, avec fourchette. estimated = pas mesuré par les stats.
+CREATE TABLE player_attributes (
+    person_id TEXT NOT NULL REFERENCES people(id),
+    attr      TEXT NOT NULL,
+    value     REAL NOT NULL,
+    low       REAL NOT NULL,
+    high      REAL NOT NULL,
+    estimated INTEGER NOT NULL,
+    PRIMARY KEY (person_id, attr)
 );
 
 -- Data Dragon (patch de départ). Les données brutes sont gardées en JSON :

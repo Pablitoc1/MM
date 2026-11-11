@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use mm_data::{Db, League, RosterMember, Team};
+use mm_data::{Db, League, PlayerDetail, RosterMember, Team};
 use serde::Serialize;
 use tauri::{Manager, State};
 
@@ -56,6 +56,11 @@ fn roster(seed: State<Seed>, team_id: String) -> Result<Vec<RosterMember>, Strin
     with_db(&seed, |db| db.roster(&team_id))
 }
 
+#[tauri::command]
+fn player(seed: State<Seed>, person_id: String) -> Result<Option<PlayerDetail>, String> {
+    with_db(&seed, |db| db.player(&person_id))
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -65,7 +70,9 @@ pub fn run() {
             app.manage(Seed(Mutex::new(db)));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![world_info, leagues, teams, roster])
+        .invoke_handler(tauri::generate_handler![
+            world_info, leagues, teams, roster, player
+        ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application");
 }
