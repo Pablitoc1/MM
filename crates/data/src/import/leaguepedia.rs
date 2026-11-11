@@ -128,6 +128,7 @@ fn unescape(x: &str) -> String {
         .replace("&#039;", "'")
         .replace("&#39;", "'")
         .replace("&amp;", "&")
+        .replace("&nbsp;", " ")
 }
 
 fn n(v: &Value, key: &str) -> f64 {
