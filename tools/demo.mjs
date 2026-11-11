@@ -12,9 +12,10 @@ if (!milestone) {
   process.exit(1);
 }
 
-// Chaque jalon déclare ses captures : nom du fichier + actions à faire avant.
-// Action : { click: 'bouton' }, { tab: 'onglet' }, { select: ['libellé', 'valeur'] }
-// ou { player: 'pseudo' } (ouvre la fiche depuis l'effectif).
+// Chaque démo déclare ses captures : nom du fichier + actions à faire avant.
+// Action : { click: 'bouton' }, { tab: 'onglet' }, { select: ['libellé', 'valeur'] },
+// { player: 'pseudo' } (ouvre la fiche depuis l'effectif)
+// ou { seek: secondes } (match en direct : place la lecture à cet instant, en pause).
 const SHOTS = {
   M0: [
     { name: 'accueil', steps: [] },
@@ -45,6 +46,15 @@ const SHOTS = {
     { name: 'caps-champions', steps: [{ click: 'Effectif' }, { select: ['Club', 'G2 Esports'] }, { player: 'Caps' }, { tab: 'Champions' }] },
     { name: 'caps-statistiques', steps: [{ click: 'Effectif' }, { select: ['Club', 'G2 Esports'] }, { player: 'Caps' }, { tab: 'Statistiques' }] },
     { name: 'effectif-niveaux-karmine-corp-blue', steps: [{ click: 'Effectif' }, { select: ['Club', 'Karmine Corp Blue'] }] },
+  ],
+  // Vue 2D du match (préparation de M6), sur le faux match KC contre G2.
+  'vue-2d': [
+    { name: '01-debut-0m45', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 45 }] },
+    { name: '02-premier-sang-3m12', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 193 }] },
+    { name: '03-double-kill-10m36', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 636 }] },
+    { name: '04-teamfight-triple-19m50', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 1190 }] },
+    { name: '05-nashor-20m20', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 1220 }] },
+    { name: '06-fin-24m05', steps: [{ click: 'Match en direct' }, { click: 'Pause' }, { seek: 1445 }] },
   ],
 };
 
@@ -86,10 +96,16 @@ for (const shot of shots) {
   await page.goto(url);
   await page.waitForLoadState('networkidle');
   for (const step of shot.steps) {
-    if (step.click) await page.getByRole('button', { name: step.click }).click();
+    if (step.click) await page.getByRole('button', { name: step.click, exact: true }).click();
     if (step.tab) await page.getByRole('tab', { name: new RegExp(step.tab) }).click();
     if (step.select) await page.getByLabel(step.select[0]).selectOption(step.select[1]);
     if (step.player) await page.getByRole('button', { name: `Fiche de ${step.player}`, exact: true }).click();
+    if (step.seek !== undefined) {
+      await page.locator('[data-testid="match-map"][data-ready="true"]').waitFor();
+      await page.getByLabel('Temps de jeu').fill(String(Math.floor(step.seek)));
+      await page.waitForTimeout(400);
+      await page.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
+    }
     await page.waitForLoadState('networkidle');
   }
   await page.evaluate(() => document.fonts.ready);

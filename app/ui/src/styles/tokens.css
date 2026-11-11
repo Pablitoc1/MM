@@ -16,6 +16,52 @@
   --accent-gold: #c8aa6e; /* icônes de rôle, étoiles */
   --gold-value: #e2c46b;
 
+  /* Carte du match en direct (maquette « match en direct v2 »). */
+  --map-camp: #c9b37a;
+  --map-camp-taken: #6b7488;
+  --map-ward: #f5d76e;
+  --map-alcove: #5e6450;
+  --map-stone: #3a4256;
+  --map-stone-light: #6b7488;
+  --map-rubble: #4a5266;
+  --map-kill: #e0614f;
+  --map-buff-blue: #4fa3e0;   /* anneau du buff bleu */
+  --map-buff-red: #e0614f;    /* anneau du buff rouge */
+  --map-scuttle: #7fd1c7;     /* anneau du carapateur */
+  --map-clash: #ffffff;       /* choc entre deux vagues */
+  --map-dead-cross: #ff5a5a;  /* croix sur un champion mort */
+  --fight-us-bg: #1d3b3f;     /* fond de l'encadré d'un combat gagné par nous */
+  --fight-them-bg: #3b2c1f;   /* … par l'adversaire */
+  --bar-hp: #4cc38a;          /* barre de vie des cartes joueurs */
+  --bar-mana: #5b8def;        /* barre de mana */
+  --drake-infernal: #f07a3a;
+  --drake-ocean: #4fa3e0;
+  --objective-void: #b48ce8;  /* larves et Nashor */
+  --item-slot: #121827;       /* case d'objet vide */
+
+  /* Composants des maquettes v2 (jauges, tags, graphiques). */
+  --text-soft: #c9d1df;     /* texte des messages */
+  --teal-text: #5fd4c8;     /* texte teal lisible sur fond sombre */
+  --track: #263248;         /* fond des jauges et barres */
+  --grid-line: #222c40;     /* lignes de repère des graphiques */
+  --row-hover: #1c2537;     /* survol d'une ligne de tableau */
+  --warn-bg: #2a2418;       /* bandeau d'alerte orange */
+  --hero-bg: #1b2a3a;       /* départ du dégradé des cartes en avant */
+  --tower-body: #3a4256;    /* tours (repères et carte) */
+  --tower-light: #5a6378;
+  --tower-top: #6b7488;
+
+  /* Couleurs des écrans complets des maquettes v2. */
+  --text-dim: #5b6b86;      /* texte secondaire très discret */
+  --accent-violet: #9b8ae0; /* méta, champions à la mode */
+  --violet-bg: #2e2a44;
+  --teal-bg: #1d3b3f;       /* fond teal sombre (renforcé) */
+  --teal-hover: #8fe3da;    /* lien survolé */
+  --gold-bg: #3a2f22;       /* fond doré sombre */
+  --bg-raised: #26304a;     /* case surélevée */
+  --danger: #e5534b;        /* blessure, défaite lourde */
+  --white: #ffffff;
+
   --font-body: 'Inter', system-ui, sans-serif;
   --font-title: 'Space Grotesk', 'Inter', sans-serif;
   --radius: 12px;
@@ -30,6 +76,6 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
-a { color: #5fd4c8; }
+a { color: var(--teal-text); }
 button { font: inherit; }
 :focus-visible { outline: 2px solid var(--team-us); outline-offset: 2px; }

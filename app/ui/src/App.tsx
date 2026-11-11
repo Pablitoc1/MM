@@ -4,6 +4,7 @@ import { SideNav } from './components/SideNav';
 import { TopBar } from './components/TopBar';
 import { NAV, type ScreenId } from './nav';
 import { Home } from './screens/Home';
+import { MatchLive } from './screens/MatchLive';
 import { Placeholder } from './screens/Placeholder';
 import { Player } from './screens/Player';
 import { DEFAULT_TEAM, Squad } from './screens/Squad';
@@ -20,6 +21,9 @@ export function App() {
 
   const item = NAV.find((n) => n.id === screen) ?? NAV[0];
 
+  // Le match en direct s'affiche en plein écran, sans menu (maquette v2).
+  if (screen === 'match') return <MatchLive onExit={() => setScreen('accueil')} />;
+
   return (
     <div className="shell">
       <TopBar world={world} />
@@ -31,7 +35,7 @@ export function App() {
             <Squad teamId={teamId} onTeamChange={setTeamId} onOpenPlayer={setPlayerId} />
           )}
           {screen === 'effectif' && playerId !== null && <Player personId={playerId} onBack={() => setPlayerId(null)} />}
-          {screen !== 'accueil' && screen !== 'effectif' && <Placeholder item={item} />}
+          {!['accueil', 'effectif', 'match'].includes(screen) && <Placeholder item={item} />}
         </main>
       </div>
     </div>

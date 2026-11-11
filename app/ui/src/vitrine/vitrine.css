@@ -1,0 +1,19 @@
+/* Mise en page de la vitrine uniquement. */
+body { overflow: auto; }
+.vt { max-width: 1280px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 28px; }
+.vt-head p { margin: 6px 0 0; max-width: 760px; line-height: 1.5; }
+.vt-h1 { margin: 0; font-family: var(--font-title); font-size: 28px; }
+.vt-h2 { margin: 0; font-family: var(--font-title); font-size: 20px; }
+.vt-section { display: flex; flex-direction: column; gap: 14px; }
+.vt-section__head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.vt-milestone { font-size: 12px; color: var(--text-muted); }
+.vt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.vt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.vt-col { display: flex; flex-direction: column; gap: 6px; }
+.vt-grid--wide { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+@media (max-width: 900px) { .vt-grid--wide { grid-template-columns: 1fr; } }
+
+/* Onglets de la vitrine : composants puis écrans de la maquette. */
+.vt-tabs { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 16px; background: var(--bg-page); border-bottom: 1px solid var(--border); }
+.vt-tabs a { padding: 6px 12px; border-radius: 6px; color: var(--text-muted); text-decoration: none; font-size: 13px; }
+.vt-tabs a[aria-current='page'] { background: var(--bg-active); color: var(--text); font-weight: 600; }
