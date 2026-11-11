@@ -47,60 +47,17 @@ export interface RosterMember {
   contractEnd: string | null;
   stats2025: SeasonStats | null;
   topChampions: string[];
-  rating: Rating | null;
-}
-
-export interface Rating {
-  level: number;
-  levelLow: number;
-  levelHigh: number;
-  potential: number;
-  games: number;
-  /** « stats » ou « estimé ». */
-  source: string;
-}
-
-export interface AttrScore {
-  key: string;
-  value: number;
-  low: number;
-  high: number;
-  estimated: boolean;
-}
-
-export interface TournamentStats {
-  tournament: string;
-  stats: SeasonStats;
-  visionPerMin: number;
-}
-
-export interface ChampionUse {
-  champion: string;
-  games: number;
-  wins: number;
-}
-
-export interface PlayerDetail {
-  member: RosterMember;
-  teamId: string;
-  leagueId: string;
-  residency: string | null;
-  nativeName: string | null;
-  attributes: AttrScore[];
-  tournaments: TournamentStats[];
-  champions: ChampionUse[];
 }
 
 interface Preview {
   leagues: League[];
   teams: Team[];
   rosters: Record<string, RosterMember[]>;
-  players: Record<string, PlayerDetail | null>;
 }
 
 export const FALLBACK_WORLD: WorldInfo = {
   date: 'Lun. 5 janvier 2026',
-  schemaVersion: 2,
+  schemaVersion: 1,
   engineVersion: 'navigateur',
 };
 
@@ -140,9 +97,4 @@ export async function listTeams(leagueId: string): Promise<Team[]> {
 export async function getRoster(teamId: string): Promise<RosterMember[]> {
   if (isTauri()) return invoke<RosterMember[]>('roster', { teamId });
   return (await loadPreview()).rosters[teamId] ?? [];
-}
-
-export async function getPlayer(personId: string): Promise<PlayerDetail | null> {
-  if (isTauri()) return invoke<PlayerDetail | null>('player', { personId });
-  return (await loadPreview()).players[personId] ?? null;
 }

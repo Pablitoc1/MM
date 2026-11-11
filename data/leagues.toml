@@ -5,6 +5,7 @@
 # Liste établie à la main (Leaguepedia ne classe pas les ligues en tiers) :
 # voir docs/decisions/005-ligues-et-tiers.md. Modifiable librement.
 # `oe` = code de la ligue dans Oracle's Elixir quand il diffère de `id`.
+# `academy_of` = ligue principale dont c'est l'académie (sert au niveau estimé de la ligue).
 # Absentes car disparues en 2026 : LVP SuperLiga (remplacée par la LES),
 # LFL Division 2 (fondue dans la LFL), Liga Valkyria (format de qualifications).
 
@@ -54,6 +55,7 @@ tier = 2
 
 [[league]]
 id = "LES"
+oe = ["LVP SL"]  # Superliga, son ancien nom
 name = "Liga Española de League of Legends"
 tier = 2
 
@@ -79,6 +81,7 @@ tier = 2
 
 [[league]]
 id = "RL"
+oe = ["UL"]  # Ultraliga en 2024
 name = "Rift Legends"
 tier = 2
 
@@ -94,11 +97,13 @@ tier = 2
 
 [[league]]
 id = "HLL"
+oe = ["GLL"]  # Greek Legends League en 2024
 name = "Hellenic Legends League"
 tier = 2
 
 [[league]]
 id = "ROL"
+oe = ["ESLOL"]  # Elite Series en 2024
 name = "TransIP Road Of Legends"
 tier = 2
 
@@ -109,22 +114,27 @@ tier = 2
 
 [[league]]
 id = "LCKCL"
+academy_of = "LCK"
 name = "LCK Challengers League"
 tier = 2
 oe = ["LCKC"]
 
 [[league]]
 id = "LDL"
+academy_of = "LPL"
 name = "LoL Development League"
 tier = 2
 
 [[league]]
 id = "NACL"
+academy_of = "LCS"
 name = "North American Challengers League"
 tier = 2
 
 [[league]]
 id = "CD"
+academy_of = "CBLOL"
+oe = ["CBLOLA"]  # CBLOL Academy en 2024
 name = "Circuito Desafiante"
 tier = 2
 
@@ -222,6 +232,7 @@ tier = 3
 
 [[league]]
 id = "LCKAS"
+academy_of = "LCKCL"
 name = "LCK Academy Series"
 tier = 3
 

@@ -6,7 +6,7 @@ import { Squad } from './Squad';
 function member(p: Partial<RosterMember> & Pick<RosterMember, 'handle' | 'role'>): RosterMember {
   return {
     personId: p.handle, realName: null, country: null, birthdate: null, isStaff: false,
-    photoFile: null, contractEnd: null, stats2025: null, topChampions: [], rating: null, ...p,
+    photoFile: null, contractEnd: null, stats2025: null, topChampions: [], ...p,
   };
 }
 
@@ -22,7 +22,6 @@ const PREVIEW = {
       member({
         handle: 'Caliste', role: 'Bot', country: 'France', birthdate: '2006-08-28', contractEnd: '2028-11-20',
         topChampions: ['Varus', 'Kaisa'],
-        rating: { level: 84.2, levelLow: 80.1, levelHigh: 88.3, potential: 93.6, games: 96, source: 'stats' },
         stats2025: { games: 10, wins: 7, kills: 40, deaths: 10, assists: 50, csPerMin: 10.04, goldPerMin: 450, damagePerMin: 812 },
       }),
       member({ handle: 'Reapered', role: 'Coach', isStaff: true }),
@@ -61,17 +60,6 @@ describe('Effectif', () => {
     await screen.findByText('Caliste');
     fireEvent.click(screen.getByRole('tab', { name: /Staff/ }));
     expect(screen.getByText('Reapered')).toBeInTheDocument();
-  });
-
-  it('montre le niveau et le potentiel, et ouvre la fiche au clic', async () => {
-    const open = vi.fn();
-    render(<Squad onOpenPlayer={open} />);
-    await screen.findByText('Caliste');
-    const row = screen.getByText('Caliste').closest('tr')!;
-    expect(within(row).getByText('84')).toBeInTheDocument();
-    expect(within(row).getByText('94')).toBeInTheDocument();
-    fireEvent.click(within(row).getByRole('button', { name: 'Fiche de Caliste' }));
-    expect(open).toHaveBeenCalledWith('Caliste');
   });
 
   it('change de club', async () => {

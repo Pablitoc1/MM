@@ -5,6 +5,7 @@
 //! (oracleselixir.com), gratuits pour les analystes et les fans.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::path::Path;
 
 use rusqlite::{params, Transaction};
 
@@ -18,8 +19,9 @@ pub const FILES: &[(u16, &str)] = &[
     (2025, "1v6LRphp2kYciU4SXp0PCjEMuev1bDejc"),
 ];
 
-/// Compétitions qui opposent des équipes de ligues différentes.
-const CROSS_LEAGUE: &[&str] = &["MSI", "WLDs", "EWC", "FST", "EM"];
+/// Compétitions qui opposent des équipes de ligues différentes (LTA : finales
+/// communes de la LCS et du CBLOL en 2025).
+const CROSS_LEAGUE: &[&str] = &["MSI", "WLDs", "EWC", "FST", "EM", "LTA"];
 
 /// Une ligne du CSV, telle quelle.
 struct Row {
@@ -60,7 +62,22 @@ impl std::fmt::Display for Summary {
     }
 }
 
-fn download(fetch: &Fetcher, year: u16, id: &str) -> Result<Vec<Row>> {
+/// Nom du fichier tel que publié par Oracle's Elixir.
+pub fn file_name(year: u16) -> String {
+    format!("{year}_LoL_esports_match_data_from_OraclesElixir.csv")
+}
+
+/// Lit le CSV de l'année : copie locale dans `local_dir` si elle existe (fichier
+/// téléchargé à la main depuis oracleselixir.com), sinon téléchargement depuis Drive.
+fn download(fetch: &Fetcher, local_dir: &Path, year: u16, id: &str) -> Result<Vec<Row>> {
+    let local = local_dir.join(file_name(year));
+    if local.exists() {
+        let bytes = std::fs::read(&local)?;
+        if !bytes.starts_with(b"gameid,") {
+            return Err(format!("{} n'est pas un CSV d'Oracle's Elixir", local.display()).into());
+        }
+        return parse(&bytes, year);
+    }
     let url =
         format!("https://drive.usercontent.google.com/download?id={id}&export=download&confirm=t");
     let bytes = fetch.get(&url)?;
@@ -69,11 +86,17 @@ fn download(fetch: &Fetcher, year: u16, id: &str) -> Result<Vec<Row>> {
         fetch.forget(&url);
         return Err(format!(
             "Oracle's Elixir {year} : Google Drive refuse le téléchargement pour l'instant \
-             (quota du fichier dépassé). Réessayer plus tard."
+             (quota du fichier dépassé). Réessayer plus tard, ou déposer {} dans {}.",
+            file_name(year),
+            local_dir.display()
         )
         .into());
     }
-    let mut reader = csv::Reader::from_reader(bytes.as_slice());
+    parse(&bytes, year)
+}
+
+fn parse(bytes: &[u8], year: u16) -> Result<Vec<Row>> {
+    let mut reader = csv::Reader::from_reader(bytes);
     let headers: Vec<String> = reader.headers()?.iter().map(str::to_string).collect();
     let mut rows = Vec::new();
     for rec in reader.records() {
@@ -88,7 +111,9 @@ fn download(fetch: &Fetcher, year: u16, id: &str) -> Result<Vec<Row>> {
         rows.push(Row {
             game: get("gameid"),
             league: get("league"),
-            year: get("year").parse().unwrap_or(year),
+            // Année du fichier (année civile) : la colonne `year` d'Oracle's Elixir est
+            // la saison, et range déjà en 2026 des parties jouées en décembre 2025.
+            year,
             playoffs: get("playoffs") == "1",
             position: get("position"),
             player: get("playername"),
@@ -120,10 +145,15 @@ fn team_key(r: &Row) -> String {
     }
 }
 
-pub fn import(fetch: &Fetcher, tx: &Transaction, leagues: &[LeagueConfig]) -> Result<Summary> {
+pub fn import(
+    fetch: &Fetcher,
+    local_dir: &Path,
+    tx: &Transaction,
+    leagues: &[LeagueConfig],
+) -> Result<Summary> {
     let mut rows = Vec::new();
     for (year, id) in FILES {
-        rows.extend(download(fetch, *year, id)?);
+        rows.extend(download(fetch, local_dir, *year, id)?);
     }
 
     // Code Oracle's Elixir → identifiant de nos ligues.
@@ -347,7 +377,11 @@ fn league_offsets(
         let mean = others.iter().map(|o| o.1).sum::<f64>() / others.len() as f64;
         for (oe, s, tier) in others {
             let ours = oe_to_ours.get(oe).cloned().unwrap_or(oe.clone());
-            let off = TIER_DEFAULT[(tier as usize).clamp(1, 3) - 1] + 0.9 * (s - mean);
+            // Une ligue de tier 2 ou 3 ne passe pas au-dessus du défaut du tier supérieur :
+            // sans match contre la LEC, rien ne permet de la placer plus haut. // estimé
+            let t = (tier as usize).clamp(1, 3) - 1;
+            let cap = if t == 0 { 1.5 } else { TIER_DEFAULT[t - 1] };
+            let off = (TIER_DEFAULT[t] + 0.9 * (s - mean)).min(cap);
             out.insert(
                 ours,
                 (
@@ -357,14 +391,30 @@ fn league_offsets(
             );
         }
     }
+    // Ligues académiques sans confrontation : la ligue principale de la région moins
+    // ACADEMY_GAP, jamais en dessous du défaut de leur tier.
     for l in leagues {
-        out.entry(l.id.clone()).or_insert((
-            TIER_DEFAULT[(l.tier as usize).clamp(1, 3) - 1],
-            "défaut du tier (estimé)".to_string(),
-        ));
+        if out.contains_key(&l.id) {
+            continue;
+        }
+        let tier_default = TIER_DEFAULT[(l.tier as usize).clamp(1, 3) - 1];
+        let parent = l.academy_of.as_ref().and_then(|p| out.get(p).map(|o| o.0));
+        let entry = match parent {
+            Some(p) => (
+                (p - ACADEMY_GAP).max(tier_default),
+                "ligue principale de la région moins l'écart académique (estimé)".to_string(),
+            ),
+            None => (tier_default, "défaut du tier (estimé)".to_string()),
+        };
+        out.insert(l.id.clone(), entry);
     }
     out
 }
+
+/// Écart entre une ligue principale et son académie, en écarts-types. // estimé :
+/// un titulaire de ligue principale domine nettement en académie, sans écart de
+/// deux tiers entiers (joueurs promus en LCK/LPL qui y tiennent leur place).
+const ACADEMY_GAP: f64 = 1.5;
 
 /// Joueur sans partie dans Oracle's Elixir : tout est estimé au niveau de sa ligue.
 fn unrated(role: &str, league: &str, offset: f64) -> PlayerRating {
@@ -476,24 +526,28 @@ mod tests {
                 name: "x".into(),
                 tier: 1,
                 oe: vec![],
+                academy_of: None,
             },
             LeagueConfig {
                 id: "LCK".into(),
                 name: "x".into(),
                 tier: 1,
                 oe: vec![],
+                academy_of: None,
             },
             LeagueConfig {
                 id: "LFL".into(),
                 name: "x".into(),
                 tier: 2,
                 oe: vec![],
+                academy_of: None,
             },
             LeagueConfig {
                 id: "HC".into(),
                 name: "x".into(),
                 tier: 3,
                 oe: vec![],
+                academy_of: None,
             },
         ];
         let mut s = BTreeMap::new();

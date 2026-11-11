@@ -41,6 +41,9 @@ pub struct LeagueConfig {
     /// (ex. la LCS s'appelait « LTA N » en 2025).
     #[serde(default)]
     pub oe: Vec<String>,
+    /// Ligue académique : la ligue principale de la même région (ex. LCKCL → LCK).
+    #[serde(default)]
+    pub academy_of: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +82,7 @@ pub fn run(opts: &Options) -> Result<()> {
     let summary = leaguepedia::import(&fetch, &tx, &leagues, &champs)?;
 
     eprintln!("Oracle's Elixir (notes des joueurs)…");
-    let notes = oracles::import(&fetch, &tx, &leagues)?;
+    let notes = oracles::import(&fetch, &opts.root.join("data/raw/oracles"), &tx, &leagues)?;
 
     eprintln!("Liquipedia (photos et logos)…");
     let slow = Fetcher::with_delay(

@@ -596,21 +596,43 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             }
         }
     }
+    let measured =
+        |a: Attr, k: &str, p: &Profile| match (raw.get(&(a, k)), attr_stats.get(&(p.role, a))) {
+            (Some(v), Some((mu, sd))) => Some((v - mu) / sd),
+            _ => None,
+        };
+    // Niveau : moyenne pondérée des attributs mesurés, elle-même ramenée à un
+    // écart-type de 1 sur le poste (une moyenne de notes resserre l'échelle).
+    let composite = |k: &str, p: &Profile| {
+        let (mut s, mut w) = (0.0, 0.0);
+        for (a, wt) in level_weights(p.role) {
+            if let Some(z) = measured(*a, k, p) {
+                s += wt * z;
+                w += wt;
+            }
+        }
+        (w > 0.0).then(|| s / w)
+    };
+    let mut level_stats: BTreeMap<Role, (f64, f64)> = BTreeMap::new();
+    for role in Role::ALL {
+        let vals: Vec<(f64, f64)> = profiles
+            .iter()
+            .filter(|(_, p)| p.role == role && reference(p))
+            .filter_map(|(k, p)| composite(k, p).map(|c| (c, p.weight)))
+            .collect();
+        if let Some(s) = mean_sd(&vals) {
+            level_stats.insert(role, s);
+        }
+    }
     for (k, p) in &profiles {
         let off = offset_of(&p.league);
         let shrink = p.weight / (p.weight + params.prior_games);
         let half = SD_20 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
         let mut attrs = BTreeMap::new();
-        let mut zs = BTreeMap::new();
         for a in Attr::ALL {
-            let measured = match (raw.get(&(a, *k)), attr_stats.get(&(p.role, a))) {
-                (Some(v), Some((mu, sd))) => Some((v - mu) / sd),
-                _ => None,
-            };
-            let score = match measured {
+            let score = match measured(a, k, p) {
                 Some(zr) => {
                     let z = off + zr * shrink;
-                    zs.insert(a, z);
                     let value = to20(z);
                     Score {
                         value,
@@ -623,15 +645,10 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             };
             attrs.insert(a, score);
         }
-        let weights = level_weights(p.role);
-        let (mut s, mut w) = (0.0, 0.0);
-        for (a, wt) in weights {
-            if let Some(z) = zs.get(a) {
-                s += wt * z;
-                w += wt;
-            }
-        }
-        let z = if w > 0.0 { s / w } else { off };
+        let z = match (composite(k, p), level_stats.get(&p.role)) {
+            (Some(c), Some((mu, sd))) => off + (c - mu) / sd * shrink,
+            _ => off,
+        };
         let level = (MID_100 + SD_100 * z).clamp(25.0, 99.0);
         let half100 = SD_100 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
         out.insert(
