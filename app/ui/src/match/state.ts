@@ -1,6 +1,6 @@
 // État de la partie à un instant donné, calculé à partir du flux.
 // Fonction pure : le même flux et le même instant donnent toujours le même état.
-import { CAMPS, STRUCTURES, wavePosition, type Camp, type Point, type Structure } from './map';
+import { CAMPS, STRUCTURES, laneLength, wavePosition, type Camp, type Point, type Structure } from './map';
 import type { ChampionInfo, Frame, Lane, MatchEvent, MatchReplay, TeamIndex } from './replay';
 
 export interface ChampionView extends ChampionInfo {
@@ -29,7 +29,16 @@ export interface TeamObjectives {
   barons: number;
 }
 
-export interface WaveView { id: number; team: TeamIndex; lane: Lane; x: number; y: number; n: number }
+export interface WaveView {
+  id: number; team: TeamIndex; lane: Lane; x: number; y: number; n: number;
+  /** Les sbires dessinés, de l'avant vers l'arrière (au plus 4, comme sur la maquette). */
+  trail: Point[];
+}
+
+/** Espace entre deux sbires dessinés d'une même vague, en unités de jeu. */
+export const WAVE_SPACING = 230;
+/** Deux vagues adverses plus proches que ça sur une voie se battent : un point de choc s'affiche. */
+export const CLASH_DISTANCE = 900;
 
 export interface CampView {
   camp: Camp;
@@ -56,6 +65,8 @@ export interface MatchState {
   waves: WaveView[];
   camps: CampView[];
   wards: WardView[];
+  /** Points de choc entre deux vagues adverses. */
+  clashes: Point[];
   /** Effets visibles à cet instant. */
   effects: Effect[];
   winner: TeamIndex | null;
@@ -247,11 +258,27 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
 
   const standing: Structure[] = STRUCTURES.filter((st) => !destroyed.has(st.id));
   const waves: WaveView[] = [];
+  const front: { lane: Lane; team: TeamIndex; d: number; p: Point }[] = [];
   for (const wa of a.waves) {
     const wb = b.waves.find((w) => w.id === wa.id);
     const d = wb ? lerp(wa.d, wb.d, k) : wa.d;
     const p = wavePosition(wa.lane, wa.team, d, standing);
-    if (p) waves.push({ id: wa.id, team: wa.team, lane: wa.lane, x: p.x, y: p.y, n: wb && k > 0.5 ? wb.n : wa.n });
+    if (!p) continue;
+    const n = wb && k > 0.5 ? wb.n : wa.n;
+    const trail: Point[] = [p];
+    for (let j = 1; j < Math.min(n, 4); j++) {
+      const q = wavePosition(wa.lane, wa.team, d - j * WAVE_SPACING, standing);
+      if (q) trail.push(q);
+    }
+    waves.push({ id: wa.id, team: wa.team, lane: wa.lane, x: p.x, y: p.y, n, trail });
+    front.push({ lane: wa.lane, team: wa.team, d, p });
+  }
+  const clashes: Point[] = [];
+  for (const blue of front.filter((w) => w.team === 0)) {
+    for (const red of front.filter((w) => w.team === 1 && w.lane === blue.lane)) {
+      if (Math.abs(laneLength(blue.lane) - blue.d - red.d) > CLASH_DISTANCE) continue;
+      clashes.push({ x: (blue.p.x + red.p.x) / 2, y: (blue.p.y + red.p.y) / 2 });
+    }
   }
 
   const visible = effects.filter((e) => {
@@ -268,6 +295,7 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
     destroyed,
     champions,
     waves,
+    clashes,
     camps: [...camps.values()],
     wards: [...wards.values()].filter((w) => w.expiresAt > time).map(({ id, team, x, y }) => ({ id, team, x, y })),
     effects: visible,

@@ -75,10 +75,12 @@ export interface Frame {
 
 export type MatchEvent =
   | { t: number; type: 'kill'; killer: number | null; victim: number; assists: number[]; respawnAt: number }
-  | { t: number; type: 'structure'; id: string; team: TeamIndex }
+  /** `by` : le champion qui donne le dernier coup, s'il y en a un. */
+  | { t: number; type: 'structure'; id: string; team: TeamIndex; by?: number }
   | { t: number; type: 'camp_spawn'; camp: string; variant?: string }
   | { t: number; type: 'camp_killed'; camp: string; team: TeamIndex; respawnAt: number | null; by?: number }
-  | { t: number; type: 'ward_placed'; id: number; team: TeamIndex; x: number; y: number; expiresAt: number }
+  /** `by` : le champion qui pose la balise. */
+  | { t: number; type: 'ward_placed'; id: number; team: TeamIndex; x: number; y: number; expiresAt: number; by?: number }
   | { t: number; type: 'ward_killed'; id: number }
   | { t: number; type: 'end'; winner: TeamIndex };
 
@@ -89,6 +91,8 @@ export interface MatchReplay {
   patch: string;
   /** Graine du moteur qui a produit la partie. */
   seed: number;
+  /** Où et quand se joue le match, pour la barre du haut. */
+  context?: { competition: string; stage: string; format: string; date: string };
   duration: number;
   teams: [TeamInfo, TeamInfo];
   /** 10 champions : 0 à 4 côté bleu, 5 à 9 côté rouge. */

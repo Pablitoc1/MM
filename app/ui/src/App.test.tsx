@@ -31,9 +31,18 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Match en direct' }));
     expect(screen.getByTestId('match-map')).toBeInTheDocument();
     expect(screen.getByTestId('match-kills')).toHaveTextContent('0 – 0');
-    for (const s of ['x1', 'x2', 'x4', 'x8', 'x16']) expect(screen.getByRole('button', { name: s })).toBeInTheDocument();
+    // Plein écran, comme la maquette : plus de menu, une barre du match en haut.
+    expect(screen.queryByRole('button', { name: 'Effectif' })).not.toBeInTheDocument();
+    expect(screen.getByText(/LEC Versus · Semaine 1 · Bo1 · Sam\. 17 janvier 2026 · Patch 26\.1/)).toBeInTheDocument();
+    for (const s of ['x1', 'x4', 'x16', 'Temps forts', 'Aller au résultat']) {
+      expect(screen.getByRole('button', { name: s })).toBeInTheDocument();
+    }
     fireEvent.change(screen.getByLabelText('Temps de jeu'), { target: { value: '1200' } });
     expect(screen.getByTestId('match-clock')).toHaveTextContent('20:00');
     expect(screen.getByTestId('match-kills')).toHaveTextContent('7 – 2');
+    fireEvent.click(screen.getByRole('button', { name: 'Aller au résultat' }));
+    expect(screen.getByText('Victoire KC')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Quitter le match' }));
+    expect(screen.getByRole('button', { name: 'Effectif' })).toBeInTheDocument();
   });
 });

@@ -22,7 +22,9 @@ Défini dans `app/ui/src/match/replay.ts`. Le moteur Rust devra produire exactem
 - Champion : ses 2 sorts d'invocateur (en-tête) ; à chaque image, ressource (mana ou énergie,
   `null` pour un champion sans ressource), niveau, cs, or gagné et objets possédés (ids Data Dragon).
 - Image : `blueWin`, les chances de victoire du côté bleu, que le moteur calculera.
-- Camp tué : `by`, le champion qui donne le dernier coup, pour le fil du match.
+- Camp tué et bâtiment détruit : `by`, le champion qui donne le dernier coup ; balise posée :
+  `by`, le champion qui la pose. Pour le fil du match.
+- En-tête : `context` (compétition, journée, format, date), pour la barre du haut.
 - La vue en déduit seule : KDA, or par équipe, dragons, larves et Nashor pris, courbe d'écart d'or,
   fil du match (kills d'un teamfight regroupés dans un bloc, comme sur la maquette).
 - L'économie du faux match (achats, revenus, cs, chances de victoire) est marquée `// estimé` :
@@ -50,3 +52,20 @@ Icône du drake océan reprise de la maquette v2.
 
 ## Nouvelle dépendance
 PixiJS 8 (rendu 2D WebGL), prévu dans la stack (note 001). Chargé seulement sur l'écran du match.
+
+## Écran aligné sur la maquette v2 (11 novembre 2026)
+Yahia a relevé que l'écran ne ressemblait pas assez à la maquette. Comparaison côte à côte, puis :
+- Plein écran, sans le menu : barre du match en haut (compétition, date, patch ; pause, x1, x4, x16,
+  « Temps forts », « Aller au résultat »).
+- Carte : portraits de 30 px cerclés de la couleur de l'équipe, morts grisés et barrés,
+  vagues en file de 4 sbires avec leur nombre, point de choc entre deux vagues, camps avec leur
+  anneau (buffs bleu et rouge, carapateur), grands objectifs en 34 px avec halo.
+- Fil : tueur, action, victime ; un multi-kill sur une ligne ; teamfight dans un encadré titré
+  (« Combat au dragon ») avec l'objectif pris pendant le combat ; balises posées avant un objectif.
+- Courbe d'or : composant commun mis à jour dans la PR des composants (repères en icônes).
+
+Écarts assumés avec la maquette :
+- Un bouton retour (‹) à gauche de la barre : sans le menu, il faut pouvoir quitter l'écran.
+- Une fine réglette d'avancement au bas de la barre, pour revoir un moment du match.
+- « Temps forts » joue en x16 hors action et ralentit en x2 autour des kills, bâtiments et objectifs.
+- « Aller au résultat » saute à la fin du match ; l'écran d'après-match arrive en M8.

@@ -118,16 +118,17 @@ const KILLS: { t: number; killer: number; victim: number; assists: number[] }[] 
   { t: 1428, killer: 1, victim: 7, assists: [2] },
 ];
 
-const STRUCTURE_KILLS: { t: number; id: string; team: TeamIndex }[] = [
-  { t: 750, id: 'red_bot_outer', team: 0 },
-  { t: 820, id: 'blue_top_outer', team: 1 },
-  { t: 960, id: 'red_mid_outer', team: 0 },
-  { t: 1310, id: 'red_mid_inner', team: 0 },
-  { t: 1350, id: 'red_mid_inhib', team: 0 },
-  { t: 1370, id: 'red_inhibitor_mid', team: 0 },
-  { t: 1400, id: 'red_nexus_top', team: 0 },
-  { t: 1414, id: 'red_nexus_bot', team: 0 },
-  { t: 1440, id: 'red_nexus', team: 0 },
+/** Bâtiments détruits ; `by` donne le dernier coup (scripté). */
+const STRUCTURE_KILLS: { t: number; id: string; team: TeamIndex; by: number }[] = [
+  { t: 750, id: 'red_bot_outer', team: 0, by: 3 },
+  { t: 820, id: 'blue_top_outer', team: 1, by: 5 },
+  { t: 960, id: 'red_mid_outer', team: 0, by: 2 },
+  { t: 1310, id: 'red_mid_inner', team: 0, by: 2 },
+  { t: 1350, id: 'red_mid_inhib', team: 0, by: 3 },
+  { t: 1370, id: 'red_inhibitor_mid', team: 0, by: 3 },
+  { t: 1400, id: 'red_nexus_top', team: 0, by: 3 },
+  { t: 1414, id: 'red_nexus_bot', team: 0, by: 0 },
+  { t: 1440, id: 'red_nexus', team: 0, by: 3 },
 ];
 
 /** Objectifs neutres : apparitions et prises. */
@@ -191,6 +192,11 @@ const INCOME: Record<Role, number> = { top: 330, jungle: 320, mid: 360, bot: 380
 const CS_RATE: Record<Role, number> = { top: 7.8, jungle: 6.2, mid: 8.4, bot: 9, support: 1.1 };
 const LEVEL_OFFSET: Record<Role, number> = { top: 0, jungle: -0.5, mid: 0.3, bot: -0.3, support: -1.5 };
 const NO_RESOURCE = new Set(['Renekton', 'Gnar']);
+/** Écart de farm de chaque joueur (+3 % = 3 % de revenus en plus), pour que la courbe d'or vive. // estimé */
+const PLAYER_EDGE = [0.02, -0.03, 0.01, 0.05, 0.02, 0.01, 0.03, 0.02, -0.02, -0.01];
+/** G2 domine la phase de lanes, KC prend le dessus après 9 minutes (comme la maquette). // estimé */
+const LANE_PHASE_END = 540;
+const teamEdge = (team: TeamIndex, t: number) => (t < LANE_PHASE_END ? (team === 0 ? -0.05 : 0.05) : (team === 0 ? 0.04 : -0.03));
 const KILL_GOLD = 300;
 const ASSIST_GOLD = 150;
 const TOWER_GOLD_TEAM = 100;
@@ -252,7 +258,7 @@ export function buildDemoReplay(): MatchReplay {
     events.push({ t: k.t, type: 'kill', killer: k.killer, victim: k.victim, assists: k.assists, respawnAt });
     deathUntil.set(k.victim, [...(deathUntil.get(k.victim) ?? []), [k.t, respawnAt]]);
   }
-  for (const s of STRUCTURE_KILLS) events.push({ t: s.t, type: 'structure', id: s.id, team: s.team });
+  for (const s of STRUCTURE_KILLS) events.push({ t: s.t, type: 'structure', id: s.id, team: s.team, by: s.by });
   events.push(...OBJECTIVES);
   events.push({ t: 1440, type: 'end', winner: 0 });
 
@@ -283,7 +289,9 @@ export function buildDemoReplay(): MatchReplay {
     for (let t = 75 + team * 11; t < 1430; t += 40 + Math.floor(rand() * 15)) {
       const p = spots[wardId % spots.length];
       const id = ++wardId;
-      const placed = { t, type: 'ward_placed' as const, id, team, x: Math.round(p.x), y: Math.round(p.y), expiresAt: t + WARD_LIFETIME };
+      // Le support et le jungler posent à tour de rôle.
+      const by = team * 5 + (id % 2 ? 4 : 1);
+      const placed = { t, type: 'ward_placed' as const, id, team, x: Math.round(p.x), y: Math.round(p.y), expiresAt: t + WARD_LIFETIME, by };
       events.push(placed);
       if (rand() < 0.3) events.push({ t: t + 20 + Math.floor(rand() * 50), type: 'ward_killed', id });
     }
@@ -381,7 +389,9 @@ export function buildDemoReplay(): MatchReplay {
     }
     waves = waves.filter((w) => w.n > 0);
 
-    for (let i = 0; i < ROSTER.length; i++) if (!isDead(i, t) && t >= CAMP_FIRST_SPAWN) aliveFarm[i] += dt;
+    for (let i = 0; i < ROSTER.length; i++) {
+      if (!isDead(i, t) && t >= CAMP_FIRST_SPAWN) aliveFarm[i] += dt * (1 + PLAYER_EDGE[i] + teamEdge(ROSTER[i].team, t));
+    }
 
     const emit = Math.abs(t - Math.round(t)) < 1e-9 || fightAt(t);
     if (emit) {
@@ -415,6 +425,8 @@ export function buildDemoReplay(): MatchReplay {
     map: 'summoners-rift',
     patch: '26.1',
     seed: SEED,
+    // Match fictif, placé comme sur la maquette au premier samedi de la LEC Versus 2026. // estimé
+    context: { competition: 'LEC Versus', stage: 'Semaine 1', format: 'Bo1', date: '2026-01-17' },
     duration: DURATION,
     teams: [{ tag: 'KC', name: 'Karmine Corp' }, { tag: 'G2', name: 'G2 Esports' }],
     champions: ROSTER,

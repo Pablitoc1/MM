@@ -74,7 +74,11 @@ describe('faux match', () => {
       const s = stateAt(replay, t);
       const standing = STRUCTURES.filter((st) => !s.destroyed.has(st.id));
       for (const w of s.waves) {
-        for (const st of standing) expect(Math.hypot(w.x - st.x, w.y - st.y)).toBeGreaterThan(WAVE_CLEARANCE - 1);
+        // Chaque sbire dessiné de la file, pas seulement la tête de vague.
+        expect(w.trail.length).toBeLessThanOrEqual(Math.min(4, w.n));
+        for (const p of w.trail) {
+          for (const st of standing) expect(Math.hypot(p.x - st.x, p.y - st.y)).toBeGreaterThan(WAVE_CLEARANCE - 1);
+        }
       }
     }
   });

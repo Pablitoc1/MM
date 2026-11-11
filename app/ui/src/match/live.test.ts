@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildDemoReplay } from './demoReplay';
-import { buildFeed, structureLabel } from './feed';
+import { buildFeed, placeName, structureLabel } from './feed';
+import { campById } from './map';
+import { formatMatchDate, goldEvents } from '../screens/MatchLive';
 import { GRUBS_PER_TAKE, analyzeEffects, goldDiffByMinute, stateAt } from './state';
 
 const replay = buildDemoReplay();
@@ -89,10 +91,42 @@ describe('fil du match', () => {
     }
   });
 
+  it('met un multi-kill hors combat sur une seule ligne', () => {
+    const feed = buildFeed(replay, 700, effects);
+    const double = feed.find((e) => e.kind === 'kill' && e.multikill === 'Double kill');
+    expect(double?.kind === 'kill' && double.victims.length).toBe(2);
+  });
+
+  it('nomme le lieu d\'un combat', () => {
+    expect(placeName(campById('dragon')!)).toBe('au dragon');
+    expect(placeName(campById('baron')!)).toBe('au Nashor');
+    expect(placeName({ x: 7400, y: 7400 })).toBe('en mid');
+  });
+
+  it('ne garde que les balises posées avant un objectif', () => {
+    const wards = buildFeed(replay, replay.duration, effects).filter((e) => e.kind === 'ward');
+    expect(wards.length).toBeGreaterThan(0);
+    expect(wards.length).toBeLessThan(12);
+  });
+
   it('attribue les objectifs au joueur qui les prend', () => {
     const feed = buildFeed(replay, replay.duration, effects);
     const dragon = feed.find((e) => e.kind === 'objective' && e.camp === 'dragon');
     expect(dragon?.kind === 'objective' && dragon.by).not.toBeNull();
     expect(feed.some((e) => e.kind === 'objective' && e.camp === 'baron')).toBe(true);
+  });
+});
+
+describe('barre et courbe du match', () => {
+  it('écrit la date du match à la française', () => {
+    expect(formatMatchDate('2026-01-17')).toBe('Sam. 17 janvier 2026');
+  });
+
+  it('place les repères de la courbe sans annoncer les kills à venir', () => {
+    const marks = goldEvents(replay, 1190, effects);
+    expect(marks.some((m) => m.kind === 'dragon')).toBe(true);
+    const fight = marks.find((m) => m.highlight && m.kind === 'kill');
+    expect(fight?.badge).toBe('×3–1');
+    expect(marks.every((m) => m.minute <= 1190 / 60)).toBe(true);
   });
 });

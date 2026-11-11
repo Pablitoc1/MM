@@ -18,6 +18,9 @@ export function App() {
 
   const item = NAV.find((n) => n.id === screen) ?? NAV[0];
 
+  // Le match en direct s'affiche en plein écran, sans menu (maquette v2).
+  if (screen === 'match') return <MatchLive onExit={() => setScreen('accueil')} />;
+
   return (
     <div className="shell">
       <TopBar world={world} />
@@ -26,7 +29,6 @@ export function App() {
         <main className="main">
           {screen === 'accueil' && <Home world={world} />}
           {screen === 'effectif' && <Squad />}
-          {screen === 'match' && <MatchLive />}
           {!['accueil', 'effectif', 'match'].includes(screen) && <Placeholder item={item} />}
         </main>
       </div>

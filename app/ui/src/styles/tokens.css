@@ -25,6 +25,13 @@
   --map-stone-light: #6b7488;
   --map-rubble: #4a5266;
   --map-kill: #e0614f;
+  --map-buff-blue: #4fa3e0;   /* anneau du buff bleu */
+  --map-buff-red: #e0614f;    /* anneau du buff rouge */
+  --map-scuttle: #7fd1c7;     /* anneau du carapateur */
+  --map-clash: #ffffff;       /* choc entre deux vagues */
+  --map-dead-cross: #ff5a5a;  /* croix sur un champion mort */
+  --fight-us-bg: #1d3b3f;     /* fond de l'encadré d'un combat gagné par nous */
+  --fight-them-bg: #3b2c1f;   /* … par l'adversaire */
   --bar-hp: #4cc38a;          /* barre de vie des cartes joueurs */
   --bar-mana: #5b8def;        /* barre de mana */
   --drake-infernal: #f07a3a;

@@ -1,18 +1,20 @@
 // Dessin de la carte en PixiJS. Lit seulement un `MatchState` (state.ts) :
 // aucune règle du jeu ici, tout vient du flux.
 import {
-  Application, Assets, ColorMatrixFilter, Container, Graphics, Sprite, Text, type Texture,
+  Application, Assets, BlurFilter, ColorMatrixFilter, Container, Graphics, Sprite, Text, type Texture,
 } from 'pixi.js';
 import { ALCOVES, CAMPS, STRUCTURES, toUnit, type CampKind, type Point } from './map';
 import type { MatchReplay, TeamIndex } from './replay';
 import { championIcon, localAsset } from './icons';
-import { formatClock, type CampView, type MatchState } from './state';
+import { GRUBS, formatClock, type CampView, type MatchState } from './state';
 
 /** Couleurs lues dans tokens.css au démarrage (Pixi ne lit pas le CSS lui-même). */
 const TOKENS = {
   page: '--bg-page', text: '--text', muted: '--text-muted', us: '--team-us', them: '--team-them',
   campRing: '--map-camp', campTaken: '--map-camp-taken', ward: '--map-ward', alcove: '--map-alcove',
   stone: '--map-stone', stoneLight: '--map-stone-light', rubble: '--map-rubble', kill: '--map-kill',
+  buffBlue: '--map-buff-blue', buffRed: '--map-buff-red', scuttle: '--map-scuttle', clash: '--map-clash',
+  cross: '--map-dead-cross', infernal: '--drake-infernal', ocean: '--drake-ocean', void: '--objective-void',
 } as const;
 
 type Palette = Record<keyof typeof TOKENS, number> & { team: [number, number] };
@@ -22,7 +24,9 @@ function readPalette(): Palette {
   const css = getComputedStyle(document.documentElement);
   const out = {} as Record<keyof typeof TOKENS, number>;
   for (const [key, name] of Object.entries(TOKENS) as [keyof typeof TOKENS, string][]) {
-    const v = css.getPropertyValue(name).trim();
+    let v = css.getPropertyValue(name).trim();
+    // La minification du CSS raccourcit « #ffffff » en « #fff ».
+    if (/^#[0-9a-f]{3}$/i.test(v)) v = `#${[...v.slice(1)].map((c) => c + c).join('')}`;
     if (!/^#[0-9a-f]{6}$/i.test(v)) throw new Error(`couleur ${name} absente de tokens.css`);
     out[key] = parseInt(v.slice(1), 16);
   }
@@ -42,15 +46,24 @@ function urlOf(path: string): string {
 
 export function assetPaths(replay: MatchReplay): string[] {
   return [
-    'map11.png', 'minion-blue.webp', 'minion-red.webp', 'camps/voidgrubs.webp',
+    'map11.png', 'camps/voidgrubs.webp', 'camps/dragon-ocean.webp',
+    'minion-blue-melee.webp', 'minion-blue-caster.webp', 'minion-red-melee.webp', 'minion-red-caster.webp',
     ...Object.values(CAMP_ICON).map((k) => `camps/${k}.webp`),
     ...replay.champions.map((c) => `champions/${c.champion}.png`),
   ];
 }
 
+/** Couleur de l'anneau d'un camp en vie (maquette). */
+function campColor(kind: CampKind): number {
+  if (kind === 'blue') return COLORS.buffBlue;
+  if (kind === 'red') return COLORS.buffRed;
+  if (kind === 'scuttle') return COLORS.scuttle;
+  return COLORS.campRing;
+}
+
 function greyFilter(): ColorMatrixFilter {
   const f = new ColorMatrixFilter();
-  f.greyscale(0.45, false);
+  f.greyscale(0.2, false); // gris et assombri : grayscale(1) brightness(.6) de la maquette
   return f;
 }
 
@@ -59,6 +72,9 @@ class Badge extends Container {
   readonly img: Sprite;
   readonly ring = new Graphics();
   readonly caption: Text;
+  private back = new Graphics();
+  private halo = new Graphics();
+  private haloColor: number | null = null;
   private grey = greyFilter();
   private isGrey = false;
 
@@ -69,7 +85,9 @@ class Badge extends Container {
     this.img.width = this.img.height = radius * 2;
     const mask = new Graphics().circle(0, 0, radius).fill(0xffffff);
     this.img.mask = mask;
-    this.addChild(this.img, mask, this.ring);
+    this.halo.filters = [new BlurFilter({ strength: radius / 3 })];
+    this.halo.visible = false;
+    this.addChild(this.halo, this.back, this.img, mask, this.ring);
     this.setRing(ringColor);
     this.caption = new Text({
       text: '',
@@ -81,15 +99,37 @@ class Badge extends Container {
     this.addChild(this.caption);
   }
 
-  setRing(color: number, width = 2) {
-    this.ring.clear().circle(0, 0, this.radius).stroke({ width, color }).circle(0, 0, this.radius + 1.5).stroke({ width: 1, color: COLORS.page });
+  /** Anneau de couleur, entouré d'un liseré sombre (`outline`) comme sur la maquette. */
+  setRing(color: number, width = 2, outline = 1) {
+    this.ring.clear()
+      .circle(0, 0, this.radius + outline / 2 + width / 2).stroke({ width: outline, color: COLORS.page })
+      .circle(0, 0, this.radius).stroke({ width, color });
+  }
+
+  /** Fond plein sous l'image (icônes de sbires détourées). */
+  bg(color: number) {
+    this.back.clear().circle(0, 0, this.radius).fill(color);
+  }
+
+  /** Halo coloré autour de l'image, ou rien. */
+  setHalo(color: number | null) {
+    if (color === this.haloColor) return;
+    this.haloColor = color;
+    this.halo.visible = color !== null;
+    if (color !== null) this.halo.clear().circle(0, 0, this.radius + 3).fill({ color, alpha: 0.8 });
+  }
+
+  /** Petite étiquette sur fond sombre (compte à rebours, nom d'objectif). */
+  pill(below: boolean) {
+    this.caption.anchor.set(0.5, below ? 0 : 1);
+    this.caption.y = below ? this.radius + 1 : -this.radius - 3;
+    this.caption.style.stroke = { color: COLORS.page, width: 3 };
   }
 
   setGrey(on: boolean) {
     if (on === this.isGrey) return;
     this.isGrey = on;
     this.img.filters = on ? [this.grey] : [];
-    this.img.alpha = on ? 0.55 : 1;
   }
 
   /** Met le texte au centre de l'image (temps de réapparition d'un champion). */
@@ -148,7 +188,8 @@ export class MatchRenderer {
   private structures = new Map<string, { icon: Graphics; rubble: Graphics }>();
   private camps = new Map<string, Badge>();
   private champions: Badge[] = [];
-  private hpBars: Graphics[] = [];
+  private crosses: Graphics[] = [];
+  private clashes = new Graphics();
   private waves = new Map<number, Container>();
   private waveLayer = new Container();
   private wards = new Graphics();
@@ -223,7 +264,11 @@ export class MatchRenderer {
     const campLayer = new Container();
     for (const camp of CAMPS) {
       const big = camp.kind === 'dragon' || camp.kind === 'baron';
-      const badge = new Badge(this.tex(`camps/${CAMP_ICON[camp.kind]}.webp`), (big ? 12 : 10) * k, COLORS.campRing, 9 * k);
+      const buff = camp.kind === 'blue' || camp.kind === 'red';
+      // Tailles de la maquette (carte de 470 px) : 34 px pour dragon et Nashor, 24 pour les buffs, 20 sinon.
+      const radius = (big ? 17 : buff ? 12 : 10) * k;
+      const badge = new Badge(this.tex(`camps/${CAMP_ICON[camp.kind]}.webp`), radius, campColor(camp.kind), 9 * k);
+      badge.pill(!big);
       const p = this.px(camp);
       badge.position.set(p.x, p.y);
       campLayer.addChild(badge);
@@ -231,16 +276,21 @@ export class MatchRenderer {
     }
 
     const champLayer = new Container();
+    champLayer.sortableChildren = true;
     this.replay.champions.forEach((c, i) => {
-      const badge = new Badge(this.tex(`champions/${c.champion}.png`), 12 * k, COLORS.team[c.team], 9 * k);
-      badge.captionInside();
-      const hp = new Graphics();
-      champLayer.addChild(badge, hp);
+      const badge = new Badge(this.tex(`champions/${c.champion}.png`), 15 * k, COLORS.team[c.team], 9 * k);
+      badge.pill(true);
+      const cross = new Graphics();
+      const r = 6 * k;
+      cross.moveTo(-r, -r).lineTo(r, r).moveTo(r, -r).lineTo(-r, r).stroke({ width: 2.5 * k, color: COLORS.cross, cap: 'round' });
+      cross.visible = false;
+      badge.addChild(cross);
+      champLayer.addChild(badge);
       this.champions[i] = badge;
-      this.hpBars[i] = hp;
+      this.crosses[i] = cross;
     });
 
-    this.world.addChild(structLayer, campLayer, this.wards, this.waveLayer, this.effects, champLayer, this.effectTexts);
+    this.world.addChild(structLayer, campLayer, this.wards, this.waveLayer, this.clashes, this.effects, champLayer, this.effectTexts);
     this.app.stage.addChild(this.world);
   }
 
@@ -251,7 +301,7 @@ export class MatchRenderer {
     for (const c of state.camps) this.renderCamp(c);
     this.renderWards(state, k);
     this.renderWaves(state, k);
-    this.renderChampions(state, k);
+    this.renderChampions(state);
     this.renderEffects(state, k);
   }
 
@@ -269,19 +319,25 @@ export class MatchRenderer {
   private renderCamp(c: CampView) {
     const badge = this.camps.get(c.camp.id)!;
     const big = c.camp.kind === 'dragon' || c.camp.kind === 'baron';
-    if (c.camp.kind === 'baron') {
-      const grubs = c.variant === 'Larves du Néant' && c.status === 'alive';
-      badge.img.texture = this.tex(`camps/${grubs ? 'voidgrubs' : 'baron'}.webp`);
-    }
     const alive = c.status === 'alive';
+    const grubs = c.camp.kind === 'baron' && c.variant === GRUBS;
+    if (c.camp.kind === 'baron') badge.img.texture = this.tex(`camps/${grubs ? 'voidgrubs' : 'baron'}.webp`);
+    if (c.camp.kind === 'dragon') badge.img.texture = this.tex(`camps/${c.variant === 'Océan' ? 'dragon-ocean' : 'dragon'}.webp`);
     // Un camp encore jamais apparu ne s'affiche qu'à moins d'une minute (sauf les grands objectifs).
     badge.visible = alive || c.respawnIn !== null && (big || c.status === 'dead' || c.respawnIn < 60);
     badge.setGrey(!alive);
-    badge.setRing(alive ? COLORS.campRing : COLORS.campTaken);
+    const color = !alive ? COLORS.campTaken
+      : c.camp.kind === 'dragon' ? (c.variant === 'Océan' ? COLORS.ocean : COLORS.infernal)
+        : c.camp.kind === 'baron' ? COLORS.void : campColor(c.camp.kind);
+    badge.setRing(color, 2, 1);
+    // Halo des grands objectifs en jeu, comme sur la maquette.
+    badge.setHalo(big && alive ? color : null);
     let label = '';
     if (!alive && c.respawnIn !== null) label = formatClock(c.respawnIn);
-    if (big && alive && c.variant) label = `${c.variant} en jeu`;
-    if (big && !alive && c.respawnIn !== null) label = `${c.camp.kind === 'baron' ? 'Nashor' : 'Dragon'} ${formatClock(c.respawnIn)}`;
+    if (big && alive) label = grubs ? 'Larves en jeu' : c.camp.kind === 'baron' ? 'Nashor en jeu' : `${c.variant ?? 'Dragon'} en jeu`;
+    if (big && !alive && c.respawnIn !== null) {
+      label = `${c.camp.kind === 'baron' ? (c.variant === GRUBS ? 'Larves' : 'Nashor') : 'Dragon'} ${formatClock(c.respawnIn)}`;
+    }
     badge.setLabel(label);
   }
 
@@ -301,48 +357,71 @@ export class MatchRenderer {
       let node = this.waves.get(w.id);
       if (!node) {
         node = new Container();
-        const badge = new Badge(this.tex(w.team === 0 ? 'minion-blue.webp' : 'minion-red.webp'), 6.5 * k, COLORS.team[w.team]);
-        badge.setRing(COLORS.team[w.team], 1.5);
+        const side = w.team === 0 ? 'blue' : 'red';
+        // Deux sbires de mêlée devant, deux casters derrière (maquette).
+        for (let j = 0; j < 4; j++) {
+          const tex = this.tex(`minion-${side}-${j < 2 ? 'melee' : 'caster'}.webp`);
+          const b = new Badge(tex, 6.5 * k, COLORS.team[w.team]);
+          b.setRing(COLORS.team[w.team], 1.5, 0);
+          b.bg(COLORS.page);
+          node.addChild(b);
+        }
+        const pill = new Graphics();
         const count = new Text({
           text: '', resolution: 3,
-          style: { fontFamily: 'Inter, sans-serif', fontSize: 8 * k, fontWeight: '700', fill: COLORS.page },
+          style: { fontFamily: 'Inter, sans-serif', fontSize: 9 * k, fontWeight: '800', fill: COLORS.page },
         });
         count.anchor.set(0.5);
-        const pill = new Graphics();
-        node.addChild(badge, pill, count);
+        node.addChild(pill, count);
         this.waveLayer.addChild(node);
         this.waves.set(w.id, node);
       }
-      const p = this.px(w);
-      node.position.set(p.x, p.y);
-      const pill = node.children[1] as Graphics;
-      const count = node.children[2] as Text;
+      const icons = node.children.slice(0, 4) as Container[];
+      icons.forEach((icon, j) => {
+        const q = w.trail[j];
+        icon.visible = q !== undefined;
+        if (q) { const p = this.px(q); icon.position.set(p.x, p.y); }
+      });
+      // Le nombre se place derrière le dernier sbire, dans l'axe de la file.
+      const last = this.px(w.trail[w.trail.length - 1]);
+      const prev = this.px(w.trail[Math.max(0, w.trail.length - 2)]);
+      let dx = last.x - prev.x;
+      let dy = last.y - prev.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1) { dx = w.team === 0 ? -1 : 1; dy = w.team === 0 ? 1 : -1; } else { dx /= len; dy /= len; }
+      const pill = node.children[4] as Graphics;
+      const count = node.children[5] as Text;
       const text = String(w.n);
-      if (count.text !== text) {
-        count.text = text;
-        pill.clear().roundRect(5 * k, -11 * k, 10 * k, 9 * k, 4 * k).fill(COLORS.team[w.team]);
-        count.position.set(10 * k, -6.5 * k);
-      }
+      if (count.text !== text) count.text = text;
+      const cx = last.x + dx * 12 * k;
+      const cy = last.y + dy * 12 * k;
+      const pw = Math.max(10 * k, count.width + 7 * k);
+      pill.clear().roundRect(cx - pw / 2, cy - 6 * k, pw, 12 * k, 6 * k).fill(COLORS.team[w.team]);
+      count.position.set(cx, cy);
     }
     for (const [id, node] of this.waves) {
       if (!seen.has(id)) { node.destroy({ children: true }); this.waves.delete(id); }
     }
+    const g = this.clashes.clear();
+    for (const c of state.clashes) {
+      const p = this.px(c);
+      g.circle(p.x, p.y, 8 * k).fill({ color: COLORS.clash, alpha: 0.18 });
+      g.circle(p.x, p.y, 5 * k).fill({ color: COLORS.clash, alpha: 0.85 });
+    }
   }
 
-  private renderChampions(state: MatchState, k: number) {
+  private renderChampions(state: MatchState) {
     for (const c of state.champions) {
       const badge = this.champions[c.index];
       const p = this.px(c);
       badge.position.set(p.x, p.y);
       badge.setGrey(!c.alive);
-      badge.setRing(c.alive ? COLORS.team[c.team] : COLORS.campTaken);
+      // Un mort est plus petit, grisé et barré d'une croix rouge (maquette).
+      badge.scale.set(c.alive ? 1 : 0.8);
+      badge.setRing(COLORS.team[c.team], 2, c.alive ? 2 : 1);
+      this.crosses[c.index].visible = !c.alive;
       badge.setLabel(!c.alive && c.respawnIn !== null ? formatClock(c.respawnIn) : '');
-      const hp = this.hpBars[c.index].clear();
-      if (c.alive) {
-        const w = 22 * k;
-        hp.rect(p.x - w / 2, p.y - 17 * k, w, 3 * k).fill({ color: COLORS.page, alpha: 0.85 });
-        hp.rect(p.x - w / 2, p.y - 17 * k, w * Math.max(0, Math.min(1, c.hp)), 3 * k).fill(COLORS.team[c.team]);
-      }
+      badge.zIndex = c.alive ? 1 : 0;
     }
   }
 
@@ -359,7 +438,6 @@ export class MatchRenderer {
         const r = (e.radius / 14990) * this.size;
         const pulse = 1 + 0.04 * Math.sin(state.t * 4);
         dashedCircle(g, p.x, p.y, r * pulse, COLORS.text, 0.55);
-        this.addLabel(`Teamfight ${e.kills[0]}–${e.kills[1]}`, p.x, p.y - r - 8 * k, COLORS.text, 10 * k, COLORS.page);
       } else {
         const s = 1 + 0.12 * Math.sin(age * 8) * Math.max(0, 1 - age / 4);
         const label = this.addLabel(e.label, p.x, p.y - 28 * k, COLORS.page, 11 * k, COLORS.team[e.team]);
