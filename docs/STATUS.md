@@ -3,8 +3,8 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-Aucun. M1 · Base de données et import réel validé par Yahia le 11 novembre 2026 (PR #4 et #5).
-Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
+Aucun. M2 · Notes des joueurs validé par Yahia le 11 novembre 2026 (PR #12 et #13).
+Prochain jalon : M3, à lancer quand Yahia dit « go M3 ».
 
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
@@ -17,7 +17,13 @@ Prochain jalon : M2, à lancer quand Yahia dit « go M2 ».
   - logos des 12 clubs LEC et 86 photos (Liquipedia), icônes des champions.
 - Commandes Tauri `leagues`, `teams`, `roster` ; la base est livrée dans l'installateur.
 - Écran Effectif : n'importe quel club LEC, joueurs et staff réels, âge, champions, stats 2025, fin de contrat.
-- `just check`, `just seed`, `just demo M0|M1`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
+- Notes des joueurs (M2, note 007) : niveau et potentiel /100, 15 attributs /20, calculés sur toutes
+  les parties pro 2014-2025 d'Oracle's Elixir (fichiers dans `data/raw/oracles/`, téléchargés à la main) :
+  écarts entre ligues, Elo mondial des équipes, apport face aux coéquipiers, courbe de progression par âge.
+  75 = joueur moyen de LEC ; meilleurs mondiaux vers 95-97. Fourchette quand la note est incertaine.
+- Fiche joueur (aperçu, attributs, champions, statistiques, contrat), ouverte depuis l'Effectif,
+  qui affiche aussi niveau et potentiel.
+- `just check`, `just seed`, `just demo M0|M1|M2`, CI GitHub (contrôles + installateurs Windows, Mac, Linux).
 
 ## En parallèle (préparation de M6, hors plan)
 Vue 2D du match sur un faux match scripté : écran « Match en direct », format du flux
@@ -26,8 +32,9 @@ Vue 2D du match sur un faux match scripté : écran « Match en direct », forma
 monté sur les composants d'interface préparés à part.
 
 ## Ce qui manque (prochain jalon)
-M2 · Notes des joueurs (attributs calculés à partir des stats).
-Pistes ouvertes par M1 : stats avancées d'Oracle's Elixir (réseau bloqué), photos des autres ligues.
+M3 · Carte et déplacements.
+Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
+postes (Rekkles noté sur ses seules parties de support) ; les notes n'évoluent pas encore (M10).
 
 ## Décisions prises
 Voir `docs/decisions/`.

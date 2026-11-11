@@ -65,6 +65,10 @@ Décisions de Yahia : installateurs Windows **et** Mac ; tous les joueurs du mon
 ### M10 · Le club au quotidien
 - Résultat : accueil et boîte de réception, planning et entraînement individuel, moral, fatigue, discussions, discours, staff.
 - Démo : une semaine d'entraînement change notes, fatigue et moral.
+- Exigence de Yahia (11/11/2026) : de la variance dans l'évolution des joueurs. Certains dépassent leur
+  potentiel, d'autres ne l'atteignent jamais ; pic plus tôt ou plus tard ; déclins et rebonds. Les carrières
+  ne doivent pas se ressembler, tout en restant réalistes (calées sur les vraies carrières, note 007)
+  et en gardant une part d'inconnu.
 - Contrôle : les effets suivent les règles du document gestion.
 
 ### M11 · Mercato, finances et direction
