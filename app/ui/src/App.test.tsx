@@ -21,9 +21,9 @@ describe('App', () => {
 
   it('change d\'écran au clic dans le menu', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effectif' }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Effectif');
-    expect(screen.getByText('Cet écran arrive au jalon M1.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tactique' }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tactique');
+    expect(screen.getByText('Cet écran arrive au jalon M7.')).toBeInTheDocument();
   });
 
   it('ouvre le match en direct avec le score et les commandes de lecture', () => {

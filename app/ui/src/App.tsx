@@ -6,6 +6,7 @@ import { NAV, type ScreenId } from './nav';
 import { Home } from './screens/Home';
 import { MatchLive } from './screens/MatchLive';
 import { Placeholder } from './screens/Placeholder';
+import { Squad } from './screens/Squad';
 
 export function App() {
   const [world, setWorld] = useState<WorldInfo>(FALLBACK_WORLD);
@@ -24,8 +25,9 @@ export function App() {
         <SideNav active={screen} onSelect={setScreen} />
         <main className="main">
           {screen === 'accueil' && <Home world={world} />}
+          {screen === 'effectif' && <Squad />}
           {screen === 'match' && <MatchLive />}
-          {screen !== 'accueil' && screen !== 'match' && <Placeholder item={item} />}
+          {!['accueil', 'effectif', 'match'].includes(screen) && <Placeholder item={item} />}
         </main>
       </div>
     </div>
