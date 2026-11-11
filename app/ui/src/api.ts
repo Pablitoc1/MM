@@ -159,3 +159,102 @@ export async function getPlayer(personId: string): Promise<PlayerDetail | null> 
   if (isTauri()) return invoke<PlayerDetail | null>('player', { personId });
   return (await loadPreview()).players[personId] ?? null;
 }
+
+// ——— Draft (M7) ———
+
+/** Poste tel que le moteur l'écrit. */
+export type DraftRole = 'top' | 'jungle' | 'mid' | 'bot' | 'support';
+export type DraftSide = 'blue' | 'red';
+export type DraftKind = 'ban' | 'pick';
+
+export interface DraftSlot {
+  role: DraftRole;
+  personId: string;
+  handle: string;
+  champion: string | null;
+  championName: string | null;
+  current: boolean;
+}
+
+export interface DraftCard {
+  champion: string;
+  name: string;
+  /** Maîtrise du joueur (A à D) ; pour un ban, rang du champion sur le patch. */
+  letter: 'A' | 'B' | 'C' | 'D';
+  winPct: number | null;
+  games: number;
+  tag: string | null;
+  available: boolean;
+  advised: boolean;
+}
+
+export interface CompAnalysis {
+  physical: number;
+  /** Engage, poke, peel, split push, teamfight : de 0 à 1. */
+  styles: [number, number, number, number, number];
+  curve: [number, number, number];
+}
+
+export interface DraftView {
+  patch: string;
+  user: DraftSide;
+  blueTeam: string;
+  redTeam: string;
+  turn: { side: DraftSide; kind: DraftKind; index: number; phase: string; role: DraftRole | null } | null;
+  next: { side: DraftSide; kind: DraftKind; count: number } | null;
+  blueBans: string[];
+  redBans: string[];
+  blue: DraftSlot[];
+  red: DraftSlot[];
+  focus: DraftRole;
+  focusHandle: string;
+  cards: DraftCard[];
+  advice: { champion: string; name: string; role: DraftRole | null; text: string } | null;
+  preview: string | null;
+  compUs: CompAnalysis;
+  compThem: CompAnalysis;
+  physicalBefore: number | null;
+  curveText: string;
+  threats: { role: DraftRole; personId: string; handle: string; label: string; champions: string[] }[];
+  lineupBlue: { role: DraftRole; personId: string; champion: string }[] | null;
+  lineupRed: { role: DraftRole; personId: string; champion: string }[] | null;
+}
+
+/**
+ * Hors de Tauri, la draft rejoue `draft-demo.json` (`just draft-demo`) : KC contre G2,
+ * où chaque choix suit le conseil du coach. Seul ce choix (ou « Déléguer ») avance.
+ */
+export const isTauriApp = isTauri;
+export const WEB_DRAFT_NOTE =
+  "Aperçu web : la draft suit le conseil du coach. Le choix libre se fait dans l'application.";
+let webDraft: { steps: DraftView[]; index: number } | null = null;
+
+export async function draftStart(blue: string, red: string, side: DraftSide, draftSeed: number): Promise<DraftView> {
+  if (isTauri()) return invoke<DraftView>('draft_start', { blue, red, side, draftSeed });
+  const r = await fetch(assetUrl('draft-demo.json'));
+  if (!r.ok) throw new Error(`draft-demo.json : ${r.status}`);
+  webDraft = { steps: ((await r.json()) as { steps: DraftView[] }).steps, index: 0 };
+  return webDraft.steps[0];
+}
+
+function webStep(move: number): DraftView {
+  if (!webDraft) throw new Error('aucune draft en cours');
+  webDraft.index = Math.min(webDraft.index + move, webDraft.steps.length - 1);
+  return webDraft.steps[webDraft.index];
+}
+
+export async function draftView(focus: DraftRole | null, preview: string | null): Promise<DraftView> {
+  if (isTauri()) return invoke<DraftView>('draft_view', { focus, preview });
+  return webStep(0);
+}
+
+export async function draftPlay(champion: string, role: DraftRole | null): Promise<DraftView> {
+  if (isTauri()) return invoke<DraftView>('draft_play', { champion, role });
+  if (webStep(0).advice?.champion !== champion) throw new Error(WEB_DRAFT_NOTE);
+  return webStep(1);
+}
+
+export async function draftDelegate(): Promise<DraftView> {
+  if (isTauri()) return invoke<DraftView>('draft_delegate');
+  return webStep(1);
+}

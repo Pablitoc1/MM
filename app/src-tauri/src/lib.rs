@@ -75,6 +75,79 @@ fn simulate_match(
     Ok(mm_world::mm_engine::simulate(&setup).replay)
 }
 
+/// Draft en cours (une à la fois).
+struct DraftState(Mutex<Option<mm_world::draft::Session>>);
+
+/// Date des matchs tant que le calendrier n'existe pas (M9) : 1re semaine de la LEC 2026.
+const DRAFT_DATE: &str = "2026-01-17";
+
+fn parse_role(role: &str) -> Option<mm_world::draft::Role> {
+    use mm_world::draft::Role;
+    Role::ALL
+        .into_iter()
+        .find(|r| format!("{r:?}").eq_ignore_ascii_case(role))
+}
+
+fn with_draft(
+    state: &State<DraftState>,
+    f: impl FnOnce(&mut mm_world::draft::Session) -> Result<(), mm_world::draft::DraftError>,
+    focus: Option<String>,
+    preview: Option<String>,
+) -> Result<mm_world::draft::View, String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    let session = guard.as_mut().ok_or("aucune draft en cours")?;
+    f(session).map_err(|e| e.to_string())?;
+    Ok(session.view(focus.as_deref().and_then(parse_role), preview.as_deref()))
+}
+
+/// Nouvelle draft entre deux clubs ; `side` : côté du club du joueur (« blue » ou « red »).
+#[tauri::command]
+fn draft_start(
+    seed: State<Seed>,
+    state: State<DraftState>,
+    blue: String,
+    red: String,
+    side: String,
+    draft_seed: u64,
+) -> Result<mm_world::draft::View, String> {
+    use mm_world::draft::{Session, Side};
+    let user = if side == "red" { Side::Red } else { Side::Blue };
+    let session = {
+        let db = seed.0.lock().map_err(|e| e.to_string())?;
+        Session::start(&db, &blue, &red, user, DRAFT_DATE, draft_seed).map_err(|e| e.to_string())?
+    };
+    let view = session.view(None, None);
+    *state.0.lock().map_err(|e| e.to_string())? = Some(session);
+    Ok(view)
+}
+
+/// Ce que montre l'écran : `focus` = poste regardé, `preview` = champion sélectionné.
+#[tauri::command]
+fn draft_view(
+    state: State<DraftState>,
+    focus: Option<String>,
+    preview: Option<String>,
+) -> Result<mm_world::draft::View, String> {
+    with_draft(&state, |_| Ok(()), focus, preview)
+}
+
+/// Choix du joueur ; l'adversaire répond aussitôt.
+#[tauri::command]
+fn draft_play(
+    state: State<DraftState>,
+    champion: String,
+    role: Option<String>,
+) -> Result<mm_world::draft::View, String> {
+    let role = role.as_deref().and_then(parse_role);
+    with_draft(&state, |s| s.play(&champion, role), None, None)
+}
+
+/// Le coach choisit à la place du joueur (« Déléguer », ou temps écoulé).
+#[tauri::command]
+fn draft_delegate(state: State<DraftState>) -> Result<mm_world::draft::View, String> {
+    with_draft(&state, |s| s.delegate(), None, None)
+}
+
 pub fn run() {
     let builder = tauri::Builder::default();
     // Mise à jour automatique : l'interface cherche une nouvelle version au lancement.
@@ -88,6 +161,7 @@ pub fn run() {
             let db = Db::open_read_only(&path)
                 .map_err(|e| format!("base de départ introuvable ({}) : {e}", path.display()))?;
             app.manage(Seed(Mutex::new(db)));
+            app.manage(DraftState(Mutex::new(None)));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -96,7 +170,11 @@ pub fn run() {
             teams,
             roster,
             player,
-            simulate_match
+            simulate_match,
+            draft_start,
+            draft_view,
+            draft_play,
+            draft_delegate
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application");
@@ -111,5 +189,13 @@ mod tests {
         let info = world_info();
         assert_eq!(info.date, "Lun. 5 janvier 2026");
         assert_eq!(info.schema_version, mm_data::SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn postes_lus_depuis_l_interface() {
+        use mm_world::draft::Role;
+        assert_eq!(parse_role("jungle"), Some(Role::Jungle));
+        assert_eq!(parse_role("support"), Some(Role::Support));
+        assert_eq!(parse_role("adc"), None);
     }
 }

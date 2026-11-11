@@ -39,7 +39,7 @@ impl Reason {
         match self {
             Reason::Meta { tier } => format!("Rang {tier} sur le patch {}", k.patch),
             Reason::Comfort { handle, games } => {
-                format!("{handle} : {games} parties en compétition")
+                format!("{games} parties en compétition pour {handle}")
             }
             Reason::Unplayed { handle } => format!("Peu joué par {handle}"),
             Reason::Counter { against } => {
