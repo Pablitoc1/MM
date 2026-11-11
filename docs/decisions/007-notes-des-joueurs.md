@@ -5,55 +5,75 @@ Date : 2026-11-11. Code : `crates/data/src/ratings.rs` (calcul, pur et testé),
 
 ## Source
 
-Oracle's Elixir, une ligne par joueur et par partie pro, années 2024 et 2025
-(toutes les ligues suivies). Fichiers publics sur le Google Drive d'Oracle's Elixir,
-téléchargés tels quels avec un User-Agent honnête. Si Drive répond « quota dépassé »,
-l'import échoue proprement et on réessaie plus tard : on ne contourne pas le quota.
+Oracle's Elixir : une ligne par joueur et par partie pro, toutes les ligues suivies,
+**de 2014 à 2025** (12 saisons, 932 200 lignes joueur). 2026 n'est pas utilisé : la partie
+commence en janvier 2026, ce serait l'avenir. Fichiers téléchargés par Yahia depuis
+oracleselixir.com et lus depuis `data/raw/oracles/` (Google Drive refusait le
+téléchargement automatique, « quota dépassé », et on ne contourne pas un quota).
 
 ## Méthode
 
-1. **Statistiques par joueur**, pondérées par l'année : une partie 2025 compte 1,
-   une partie 2024 compte 0,5. Le poste retenu est celui le plus joué.
-2. **Recette de chaque attribut** : une moyenne pondérée de stats standardisées.
+1. **Chaque partie est comparée à sa ligue et à son année.** Chaque stat est ramenée
+   en écarts-types par rapport aux joueurs du même poste, de la même ligue, la même
+   année (au moins 40 parties, sinon tous les pros du poste cette année-là). Une
+   ligue plus lente, un méta différent ou une époque différente ne faussent plus
+   la comparaison. À l'international, un joueur compte dans sa ligue d'origine.
+   Les anciens noms des ligues sont reliés aux nouveaux (`oe` dans `data/leagues.toml` :
+   EU LCS → LEC, NA LCS → LCS, LMS → PCS, Challengers Korea → LCKCL…).
+2. **Poids des années.** Forme actuelle : demi-vie d'un an et demi (2025 : 1 ;
+   2024 : 0,63 ; 2023 : 0,40 ; 2020 : 0,10). Carrière (régularité, grands matchs,
+   sang-froid, écart entre ligues) : demi-vie de quatre ans. Expérience : toutes les
+   parties (`// estimé`).
+3. **Recette de chaque attribut** : une moyenne pondérée de stats standardisées.
 
    | Attribut | Stats utilisées |
    |---|---|
    | Mécanique | KDA, dégâts par or, dégâts/min |
-   | Laning | écart d'or à 15 (0,35), d'XP (0,25), de CS (0,25), morts avant 15 (−0,15) |
+   | Laning | écart d'or à 15 (0,35), d'XP (0,25), de CS (0,25), morts avant 15 (−0,15) ; support : or 0,3, XP 0,4, morts −0,3 (sans CS) |
    | Farm | CS/min, part de l'or |
    | Teamfight | part des dégâts, dégâts/min, participation aux kills, morts tardives (−) |
    | Escarmouche | kills + assists avant 15, first blood |
    | Lecture de carte | morts/min (−), participation aux kills, first blood |
    | Décision | KDA, morts/min (−), victoires |
    | Vision | vision/min, wards posées, détruites, pinks |
-   | Pool de champions | ln(1 + champions joués 2 fois ou plus) + entropie |
-   | Régularité | écart-type (−) du score par partie, 8 parties minimum |
-   | Grands matchs | score en playoffs et à l'international moins sa moyenne, 5 parties minimum |
-   | Sang-froid | score dans les parties où l'équipe est à −1 500 d'or à 15 min, 5 minimum |
+   | Pool de champions | ln(1 + champions joués 2 fois ou plus) + entropie, dernière saison |
+   | Régularité | écart-type (−) du score par partie, sur la carrière |
+   | Grands matchs | score en playoffs et à l'international moins sa moyenne, sur la carrière |
+   | Sang-froid | score dans les parties où l'équipe est à −1 500 d'or à 15 min |
 
-3. **Comparaison au sein du poste** : chaque attribut est ramené en écarts-types (z)
-   par rapport aux joueurs du même poste ayant au moins 10 parties pondérées.
-4. **Force de la ligue** : modèle de Bradley-Terry sur les matchs entre ligues
-   (MSI, Worlds, EWC, First Stand, EM), LEC = 0. Une log-cote de 1 vaut 0,9 écart-type
-   (`// estimé`). Une ligue sans match international reprend la valeur de son tier :
-   −0,5 / −1,2 / −1,8 (`// estimé`, à recaler quand les ligues se croisent davantage).
-   Les forces sont dans la table `league_strength`.
-5. **Rétrécissement** vers la moyenne de la ligue quand il y a peu de parties :
-   z = force de la ligue + z brut × w / (w + 12), w = parties pondérées.
+4. **Écart entre les ligues** (table `league_strength`), en écarts-types de niveau,
+   LEC = 0. Moindres carrés sur deux sources réelles :
+   - les **matchs entre ligues** (Worlds, MSI, EWC, First Stand, EMEA Masters, IEM…) :
+     modèle de Bradley-Terry, comparé paire par paire de ligues qui se sont
+     affrontées ; une log-cote de 1 vaut 0,9 écart-type (`// estimé`). Les coupes hors
+     saison (Demacia Cup, KeSPA Cup, NEST) sont exclues : les clubs y alignent leurs
+     remplaçants ;
+   - les **joueurs passés d'une ligue à l'autre** (9 650 cas, deux saisons d'au moins
+     10 parties à un an d'écart au plus) : à niveau égal, l'écart de leurs scores
+     dans chaque ligue mesure l'écart entre les ligues.
+
+   Un a priori par tier (−0,5 / −1,2 / −1,8, `// estimé`) ne compte que pour une ligue
+   que rien ne relie aux autres. Académies : a priori = ligue principale − 1,5.
+   Résultat : LCK +0,84, LPL +0,61, LEC 0, LCKCL −0,03, LCS −0,11, LCP −0,29,
+   LDL −0,35, LFL −0,47 … NLC −1,29.
+5. **Passage à l'échelle de la LEC** : z = décalage moyen des ligues où il a joué
+   (pondéré comme ses parties) + écart avec sa ligue × lissage × transfert.
+   Lissage = w / (w + 12), w = parties pondérées. Transfert : dans une ligue plus
+   faible, dominer ses adversaires dit moins (équipe, contexte) ; on garde 75 % de
+   l'écart pour une ligue un écart-type sous la LEC, jamais moins de 50 % (`// estimé`).
 6. **Échelle** : note /20 = 10,5 + 3 z (moyenne LEC à 10,5). Fourchette :
-   ± 3 × √(12 / (w + 12)). Elle s'affiche dès que la demi-largeur dépasse 1,5 point,
-   soit moins d'environ 36 parties pondérées (un split et demi).
-7. **Niveau /100** = 60 + 10 z, z moyen pondéré par poste (le support pèse surtout
-   la vision et le teamfight, le jungler la lecture de carte et l'escarmouche, les
-   autres la mécanique, le laning et le teamfight). Même fourchette, sur 100.
+   ± 3 × √(12 / (w + 12)), affichée dès que la demi-largeur dépasse 1,5 point.
+7. **Niveau /100** = 60 + 10 z, z = moyenne pondérée des attributs du poste (support :
+   surtout vision et teamfight ; jungle : lecture de carte et escarmouche ; autres :
+   mécanique, laning, teamfight). Même échelle que les attributs affichés.
 8. **Potentiel /100** = niveau + 2 points par année avant 24 ans, plafonné à 99
-   (`// estimé`, courbe usuelle à calibrer avec les carrières en M10). Âge inconnu : +4.
+   (`// estimé`, à calibrer avec les carrières en M10). Âge inconnu : +4.
 
 ## Ce que les stats ne mesurent pas
 
 Shotcalling, communication et professionnalisme sont marqués « estimé » et toujours
 affichés en fourchette de ± 3 : niveau de la ligue, plus un bonus d'expérience
-(jusqu'à 2 saisons pleines) et, pour le shotcalling, un bonus de poste (support,
+(jusqu'à 4 saisons pleines, toutes les parties de la carrière) et, pour le shotcalling, un bonus de poste (support,
 jungle, mid). Ils seront affinés quand le staff et les rapports de scouts arriveront.
 
 Un joueur absent d'Oracle's Elixir (académie, nouveau venu) reçoit des notes estimées

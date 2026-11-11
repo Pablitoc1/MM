@@ -1,8 +1,9 @@
-//! Oracle's Elixir : une ligne par joueur et par partie pro, pour toutes les ligues.
-//! Sert à calculer les notes des joueurs (`crate::ratings`).
+//! Oracle's Elixir : une ligne par joueur et par partie pro, pour toutes les ligues,
+//! de 2014 à 2025. Sert à calculer les notes des joueurs (`crate::ratings`).
 //!
-//! Fichiers CSV publics, hébergés sur Google Drive par Tim Sevenhuysen
-//! (oracleselixir.com), gratuits pour les analystes et les fans.
+//! Fichiers CSV publics, publiés par Tim Sevenhuysen (oracleselixir.com), gratuits
+//! pour les analystes et les fans. Copie locale dans `data/raw/oracles/` (fichiers
+//! téléchargés à la main), sinon téléchargement depuis Google Drive pour 2024-2025.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
@@ -11,53 +12,132 @@ use rusqlite::{params, Transaction};
 
 use super::http::Fetcher;
 use super::{LeagueConfig, Result};
-use crate::ratings::{self, Attr, GameLine, Params, PlayerRating, Role, Score};
+use crate::ratings::{self, Attr, GameLine, LeagueLink, Params, PlayerRating, Role, Score};
 
-/// Fichiers utilisés : 2024 et 2025 (la partie commence en janvier 2026).
-pub const FILES: &[(u16, &str)] = &[
+/// Années utilisées : toute l'histoire disponible jusqu'à la veille du début de la
+/// partie (janvier 2026). 2026 serait l'avenir pour le joueur.
+pub const YEARS: std::ops::RangeInclusive<u16> = 2014..=2025;
+
+/// Fichiers récents aussi disponibles sur le Google Drive d'Oracle's Elixir.
+const DRIVE: &[(u16, &str)] = &[
     (2024, "1IjIEhLc9n8eLKeY-yh_YigKVWbhgGBsN"),
     (2025, "1v6LRphp2kYciU4SXp0PCjEMuev1bDejc"),
 ];
 
-/// Compétitions qui opposent des équipes de ligues différentes (LTA : finales
-/// communes de la LCS et du CBLOL en 2025).
-const CROSS_LEAGUE: &[&str] = &["MSI", "WLDs", "EWC", "FST", "EM", "LTA"];
+/// Compétitions qui opposent des équipes de ligues différentes : internationaux,
+/// EMEA Masters, finales communes.
+const CROSS_LEAGUE: &[&str] = &[
+    "MSI", "WLDs", "EWC", "FST", "EM", "EUM", "LTA", "IEM", "IWCI", "MSC", "ASCI", "AmCh",
+];
 
-/// Une ligne du CSV, telle quelle.
+/// Coupes nationales hors saison (Demacia Cup, KeSPA Cup, NEST) : les clubs y alignent
+/// souvent remplaçants et académie. Ignorées pour l'écart entre les ligues.
+const OFFSEASON_CUPS: &[&str] = &["DCup", "KeSPA Cup", "KeSPA", "NEST"];
+
+/// Poids d'une partie pour la forme actuelle : demi-vie d'un an et demi.
+/// 2025 compte 1, 2024 : 0,63, 2023 : 0,40, 2020 : 0,10. // estimé
+fn form_weight(year: u16) -> f64 {
+    0.5f64.powf((2025.0 - year as f64) / 1.5)
+}
+
+/// Poids d'une partie pour la carrière (régularité, grands matchs, sang-froid) et
+/// pour l'écart entre les ligues : demi-vie de quatre ans. // estimé
+fn career_weight(year: u16) -> f64 {
+    0.5f64.powf((2025.0 - year as f64) / 4.0)
+}
+
+/// Colonnes numériques lues dans le CSV.
+const NUM_COLS: [&str; 23] = [
+    "gamelength",
+    "kills",
+    "deaths",
+    "assists",
+    "teamkills",
+    "damagetochampions",
+    "damageshare",
+    "earnedgoldshare",
+    "total cs",
+    "visionscore",
+    "wardsplaced",
+    "wardskilled",
+    "controlwardsbought",
+    "golddiffat15",
+    "csdiffat15",
+    "xpdiffat15",
+    "killsat15",
+    "assistsat15",
+    "deathsat15",
+    "firstbloodkill",
+    "firstbloodassist",
+    "result",
+    "playoffs",
+];
+
+/// Une ligne du CSV, réduite à ce qui sert.
 struct Row {
     game: String,
     league: String,
-    year: u16,
-    playoffs: bool,
     position: String,
     player: String,
     player_id: String,
     team: String,
     team_id: String,
     champion: String,
-    win: bool,
-    fields: HashMap<String, String>,
+    nums: [Option<f32>; NUM_COLS.len()],
 }
 
 impl Row {
     fn f(&self, k: &str) -> Option<f64> {
-        self.fields.get(k).and_then(|v| v.parse().ok())
+        let i = NUM_COLS.iter().position(|c| *c == k)?;
+        self.nums[i].map(f64::from)
+    }
+    fn win(&self) -> bool {
+        self.f("result") == Some(1.0)
+    }
+    fn playoffs(&self) -> bool {
+        self.f("playoffs") == Some(1.0)
+    }
+    /// Clé d'un joueur : l'identifiant Oracle's Elixir (stable d'une année à l'autre),
+    /// sinon le pseudo.
+    fn player_key(&self) -> String {
+        if self.player_id.is_empty() {
+            format!("nom:{}", self.player.to_lowercase())
+        } else {
+            self.player_id.clone()
+        }
+    }
+    fn team_key(&self) -> String {
+        if self.team_id.is_empty() {
+            self.team.clone()
+        } else {
+            self.team_id.clone()
+        }
     }
 }
 
 pub struct Summary {
+    pub years: usize,
     pub games: usize,
     pub rated: usize,
     pub matched: usize,
     pub estimated: usize,
+    pub bridges: usize,
+    pub cross_matches: usize,
 }
 
 impl std::fmt::Display for Summary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Oracle's Elixir : {} lignes joueur, {} joueurs notés, {} rapprochés de la base, {} notes estimées (sans stats)",
-            self.games, self.rated, self.matched, self.estimated
+            "Oracle's Elixir : {} années, {} lignes joueur, {} matchs entre ligues, {} transferts entre ligues, \
+             {} joueurs notés, {} rapprochés de la base, {} notes estimées (sans stats)",
+            self.years,
+            self.games,
+            self.cross_matches,
+            self.bridges,
+            self.rated,
+            self.matched,
+            self.estimated
         )
     }
 }
@@ -67,17 +147,20 @@ pub fn file_name(year: u16) -> String {
     format!("{year}_LoL_esports_match_data_from_OraclesElixir.csv")
 }
 
-/// Lit le CSV de l'année : copie locale dans `local_dir` si elle existe (fichier
-/// téléchargé à la main depuis oracleselixir.com), sinon téléchargement depuis Drive.
-fn download(fetch: &Fetcher, local_dir: &Path, year: u16, id: &str) -> Result<Vec<Row>> {
+/// Lit le CSV de l'année : copie locale dans `local_dir` si elle existe, sinon
+/// téléchargement depuis Drive (2024-2025 seulement). `None` : année absente.
+fn load(fetch: &Fetcher, local_dir: &Path, year: u16) -> Result<Option<Vec<Row>>> {
     let local = local_dir.join(file_name(year));
     if local.exists() {
         let bytes = std::fs::read(&local)?;
         if !bytes.starts_with(b"gameid,") {
             return Err(format!("{} n'est pas un CSV d'Oracle's Elixir", local.display()).into());
         }
-        return parse(&bytes, year);
+        return parse(&bytes).map(Some);
     }
+    let Some((_, id)) = DRIVE.iter().find(|(y, _)| *y == year) else {
+        return Ok(None);
+    };
     let url =
         format!("https://drive.usercontent.google.com/download?id={id}&export=download&confirm=t");
     let bytes = fetch.get(&url)?;
@@ -92,156 +175,133 @@ fn download(fetch: &Fetcher, local_dir: &Path, year: u16, id: &str) -> Result<Ve
         )
         .into());
     }
-    parse(&bytes, year)
+    parse(&bytes).map(Some)
 }
 
-fn parse(bytes: &[u8], year: u16) -> Result<Vec<Row>> {
+fn parse(bytes: &[u8]) -> Result<Vec<Row>> {
     let mut reader = csv::Reader::from_reader(bytes);
-    let headers: Vec<String> = reader.headers()?.iter().map(str::to_string).collect();
+    let headers = reader.headers()?.clone();
+    let col = |name: &str| headers.iter().position(|h| h == name);
+    let text = [
+        "gameid",
+        "league",
+        "position",
+        "playername",
+        "playerid",
+        "teamname",
+        "teamid",
+        "champion",
+    ]
+    .map(col);
+    let nums = NUM_COLS.map(col);
     let mut rows = Vec::new();
-    for rec in reader.records() {
+    for rec in reader.byte_records() {
         let rec = rec?;
-        let fields: HashMap<String, String> = headers
-            .iter()
-            .zip(rec.iter())
-            .filter(|(_, v)| !v.is_empty())
-            .map(|(k, v)| (k.clone(), v.to_string()))
-            .collect();
-        let get = |k: &str| fields.get(k).cloned().unwrap_or_default();
+        let get = |i: Option<usize>| {
+            i.and_then(|i| rec.get(i))
+                .map(|v| String::from_utf8_lossy(v).into_owned())
+                .unwrap_or_default()
+        };
+        let num = |i: Option<usize>| -> Option<f32> {
+            i.and_then(|i| rec.get(i))
+                .and_then(|v| std::str::from_utf8(v).ok())
+                .and_then(|v| v.trim().parse().ok())
+        };
         rows.push(Row {
-            game: get("gameid"),
-            league: get("league"),
-            // Année du fichier (année civile) : la colonne `year` d'Oracle's Elixir est
-            // la saison, et range déjà en 2026 des parties jouées en décembre 2025.
-            year,
-            playoffs: get("playoffs") == "1",
-            position: get("position"),
-            player: get("playername"),
-            player_id: get("playerid"),
-            team: get("teamname"),
-            team_id: get("teamid"),
-            champion: get("champion"),
-            win: get("result") == "1",
-            fields,
+            game: get(text[0]),
+            league: get(text[1]),
+            position: get(text[2]),
+            player: get(text[3]),
+            player_id: get(text[4]),
+            team: get(text[5]),
+            team_id: get(text[6]),
+            champion: get(text[7]),
+            nums: nums.map(num),
         });
     }
     Ok(rows)
 }
 
-/// Clé d'un joueur : l'identifiant Oracle's Elixir, sinon le pseudo.
-fn player_key(r: &Row) -> String {
-    if r.player_id.is_empty() {
-        format!("nom:{}", r.player.to_lowercase())
-    } else {
-        r.player_id.clone()
-    }
+/// Une année : parties des joueurs, et matchs entre ligues (ligue A, ligue B, A gagne).
+struct YearData {
+    lines: Vec<GameLine>,
+    cross: Vec<(String, String, bool)>,
+    /// Pseudo en minuscules → identifiants Oracle's Elixir.
+    names: Vec<(String, String)>,
 }
 
-fn team_key(r: &Row) -> String {
-    if r.team_id.is_empty() {
-        r.team.clone()
-    } else {
-        r.team_id.clone()
-    }
-}
-
-pub fn import(
-    fetch: &Fetcher,
-    local_dir: &Path,
-    tx: &Transaction,
-    leagues: &[LeagueConfig],
-) -> Result<Summary> {
-    let mut rows = Vec::new();
-    for (year, id) in FILES {
-        rows.extend(download(fetch, local_dir, *year, id)?);
-    }
-
-    // Code Oracle's Elixir → identifiant de nos ligues.
-    let mut oe_to_ours: HashMap<String, String> = HashMap::new();
-    for l in leagues {
-        oe_to_ours.insert(l.id.clone(), l.id.clone());
-        for code in &l.oe {
-            oe_to_ours.insert(code.clone(), l.id.clone());
-        }
-    }
-
-    // Ligue principale de chaque équipe (hors compétitions inter-ligues), par année.
-    let mut team_league: BTreeMap<(u16, String), BTreeMap<String, u32>> = BTreeMap::new();
-    for r in rows
-        .iter()
-        .filter(|r| r.position == "team" && !CROSS_LEAGUE.contains(&r.league.as_str()))
-    {
+/// Transforme les lignes d'une année. La ligue d'une partie est la ligue « maison »
+/// de l'équipe cette année-là, même à l'international.
+fn year_data(rows: &[Row], year: u16, oe_to_ours: &HashMap<String, String>) -> YearData {
+    let ours = |oe: &str| {
+        oe_to_ours
+            .get(oe)
+            .cloned()
+            .unwrap_or_else(|| oe.to_string())
+    };
+    let mut team_league: BTreeMap<String, BTreeMap<String, u32>> = BTreeMap::new();
+    for r in rows.iter().filter(|r| {
+        r.position == "team"
+            && !CROSS_LEAGUE.contains(&r.league.as_str())
+            && !OFFSEASON_CUPS.contains(&r.league.as_str())
+    }) {
         *team_league
-            .entry((r.year, team_key(r)))
+            .entry(r.team_key())
             .or_default()
-            .entry(r.league.clone())
+            .entry(ours(&r.league))
             .or_default() += 1;
     }
-    let home = |year: u16, team: &str| -> Option<String> {
-        let counts = team_league.get(&(year, team.to_string()))?;
-        let best = counts
-            .iter()
-            .max_by_key(|(l, n)| (**n, std::cmp::Reverse((*l).clone())))?;
-        Some(best.0.clone())
+    let home = |r: &Row| -> String {
+        team_league
+            .get(&r.team_key())
+            .and_then(|c| {
+                c.iter()
+                    .max_by_key(|(l, n)| (**n, std::cmp::Reverse((*l).clone())))
+                    .map(|b| b.0.clone())
+            })
+            .unwrap_or_else(|| ours(&r.league))
     };
 
-    // Matchs entre ligues → force des ligues.
+    // Matchs entre deux équipes de ligues différentes.
     let mut by_game: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
-    for r in rows
-        .iter()
-        .filter(|r| r.position == "team" && CROSS_LEAGUE.contains(&r.league.as_str()))
-    {
-        by_game.entry(&r.game).or_default().push(r);
+    let mut team_gd15: HashMap<(&str, String), f64> = HashMap::new();
+    for r in rows.iter().filter(|r| r.position == "team") {
+        if !OFFSEASON_CUPS.contains(&r.league.as_str()) {
+            by_game.entry(&r.game).or_default().push(r);
+        }
+        if let Some(gd) = r.f("golddiffat15") {
+            team_gd15.insert((&r.game, r.team_key()), gd);
+        }
     }
     let mut cross = Vec::new();
     for teams in by_game.values() {
         if let [a, b] = teams.as_slice() {
-            if let (Some(la), Some(lb)) = (home(a.year, &team_key(a)), home(b.year, &team_key(b))) {
-                if la != lb {
-                    cross.push((la, lb, a.win));
-                }
+            let (la, lb) = (home(a), home(b));
+            if la != lb {
+                cross.push((la, lb, a.win()));
             }
         }
     }
-    let offsets = league_offsets(&ratings::league_strength(&cross), leagues, &oe_to_ours);
-    for (league, (offset, source)) in &offsets {
-        tx.execute(
-            "INSERT INTO league_strength (league_id, offset, source) VALUES (?1, ?2, ?3)",
-            params![league, offset, source],
-        )?;
-    }
 
-    // Lignes joueur → parties pour le calcul. Écart d'or de l'équipe à 15 min par partie.
-    let mut team_gd15: HashMap<(String, String), f64> = HashMap::new();
-    for r in rows.iter().filter(|r| r.position == "team") {
-        if let Some(gd) = r.f("golddiffat15") {
-            team_gd15.insert((r.game.clone(), team_key(r)), gd);
-        }
-    }
     let mut lines = Vec::new();
-    for r in &rows {
+    let mut names = BTreeSet::new();
+    for r in rows {
         let Some(role) = Role::from_oe(&r.position) else {
             continue;
         };
-        // Ligue « maison » du joueur pour cette partie (sa ligue même à l'international).
-        let oe_league = if CROSS_LEAGUE.contains(&r.league.as_str()) {
-            home(r.year, &team_key(r)).unwrap_or_else(|| r.league.clone())
-        } else {
-            r.league.clone()
-        };
-        let league = oe_to_ours.get(&oe_league).cloned().unwrap_or(oe_league);
+        names.insert((r.player.to_lowercase(), r.player_key()));
         let fb = match (r.f("firstbloodkill"), r.f("firstbloodassist")) {
             (None, None) => None,
             (k, a) => Some(k.unwrap_or(0.0) + a.unwrap_or(0.0) > 0.0),
         };
         lines.push(GameLine {
-            player: player_key(r),
-            league,
-            year: r.year,
-            big_match: r.playoffs || CROSS_LEAGUE.contains(&r.league.as_str()),
+            player: r.player_key(),
+            league: home(r),
+            year,
+            big_match: r.playoffs() || CROSS_LEAGUE.contains(&r.league.as_str()),
             role,
             champion: r.champion.clone(),
-            win: r.win,
+            win: r.win(),
             minutes: r.f("gamelength").unwrap_or(1800.0) / 60.0,
             kills: r.f("kills").unwrap_or(0.0),
             deaths: r.f("deaths").unwrap_or(0.0),
@@ -262,26 +322,172 @@ pub fn import(
             assists_15: r.f("assistsat15"),
             deaths_15: r.f("deathsat15"),
             first_blood: fb,
-            team_gold_diff_15: team_gd15.get(&(r.game.clone(), team_key(r))).copied(),
+            team_gold_diff_15: team_gd15.get(&(r.game.as_str(), r.team_key())).copied(),
         });
+    }
+    YearData {
+        lines,
+        cross,
+        names: names.into_iter().collect(),
+    }
+}
+
+/// Écart entre deux ligues mesuré par les joueurs passés de l'une à l'autre :
+/// deux saisons d'au moins 10 parties, la même année ou à un an d'écart.
+fn bridges(seasons: &[ratings::Season]) -> Vec<LeagueLink> {
+    let mut by_player: BTreeMap<&str, Vec<&ratings::Season>> = BTreeMap::new();
+    for s in seasons {
+        by_player.entry(&s.player).or_default().push(s);
+    }
+    let mut out = Vec::new();
+    for list in by_player.values() {
+        for (i, a) in list.iter().enumerate() {
+            for b in &list[i + 1..] {
+                if a.league == b.league || a.year.abs_diff(b.year) > 1 {
+                    continue;
+                }
+                let n = a.games.min(b.games) as f64;
+                let w = (n / 20.0).min(1.0) * career_weight(a.year.max(b.year));
+                out.push(LeagueLink {
+                    a: a.league.clone(),
+                    b: b.league.clone(),
+                    gap: b.z - a.z,
+                    weight: w,
+                });
+            }
+        }
+    }
+    out
+}
+
+pub fn import(
+    fetch: &Fetcher,
+    local_dir: &Path,
+    tx: &Transaction,
+    leagues: &[LeagueConfig],
+) -> Result<Summary> {
+    // Code Oracle's Elixir → identifiant de nos ligues (noms anciens compris).
+    let mut oe_to_ours: HashMap<String, String> = HashMap::new();
+    for l in leagues {
+        oe_to_ours.insert(l.id.clone(), l.id.clone());
+        for code in &l.oe {
+            oe_to_ours.insert(code.clone(), l.id.clone());
+        }
+    }
+
+    let mut lines = Vec::new();
+    let mut cross = Vec::new();
+    let mut names: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut years = 0;
+    for year in YEARS {
+        let Some(rows) = load(fetch, local_dir, year)? else {
+            continue;
+        };
+        years += 1;
+        let data = year_data(&rows, year, &oe_to_ours);
+        lines.extend(data.lines);
+        for (name, key) in data.names {
+            names.entry(name).or_default().insert(key);
+        }
+        cross.extend(
+            data.cross
+                .into_iter()
+                .map(|(a, b, w)| (a, b, w, career_weight(year))),
+        );
+    }
+    for y in [2024, 2025] {
+        if !lines.iter().any(|g| g.year == y) {
+            return Err(format!(
+                "Oracle's Elixir {y} manquant : déposer {} dans {}",
+                file_name(y),
+                local_dir.display()
+            )
+            .into());
+        }
+    }
+
+    // Écart entre les ligues : matchs entre ligues (Bradley-Terry, comparé paire par
+    // paire, donc seulement entre ligues qui se sont affrontées) + joueurs passés d'une
+    // ligue à l'autre.
+    let strength = ratings::league_strength(&cross);
+    let mut pairs: BTreeMap<(&str, &str), f64> = BTreeMap::new();
+    let mut matches_per_league: BTreeMap<&str, f64> = BTreeMap::new();
+    for (a, b, _, w) in &cross {
+        let key = if a < b {
+            (a.as_str(), b.as_str())
+        } else {
+            (b.as_str(), a.as_str())
+        };
+        *pairs.entry(key).or_default() += w;
+        *matches_per_league.entry(a).or_default() += w;
+        *matches_per_league.entry(b).or_default() += w;
+    }
+    let mut links: Vec<LeagueLink> = pairs
+        .iter()
+        .map(|((a, b), n)| LeagueLink {
+            a: a.to_string(),
+            b: b.to_string(),
+            gap: ratings::LOGODDS_TO_LEVEL * (strength[*a] - strength[*b]),
+            weight: n * MATCH_WEIGHT,
+        })
+        .collect();
+    let transfers = bridges(&ratings::seasons(&lines, 10));
+    let mut transfers_per_league: BTreeMap<&str, usize> = BTreeMap::new();
+    for t in &transfers {
+        *transfers_per_league.entry(&t.a).or_default() += 1;
+        *transfers_per_league.entry(&t.b).or_default() += 1;
+    }
+    let n_transfers = transfers.len();
+    links.extend(transfers.iter().cloned());
+    let mut priors: BTreeMap<String, f64> = leagues
+        .iter()
+        .map(|l| {
+            (
+                l.id.clone(),
+                TIER_DEFAULT[(l.tier as usize).clamp(1, 3) - 1],
+            )
+        })
+        .collect();
+    let mut offsets = ratings::solve_offsets(&links, &priors, PRIOR_WEIGHT);
+    // Académies : a priori = ligue principale moins l'écart académique, puis on refait.
+    for l in leagues {
+        if let Some(parent) = l.academy_of.as_ref().and_then(|p| offsets.get(p)) {
+            priors.insert(l.id.clone(), parent - ACADEMY_GAP);
+        }
+    }
+    offsets = ratings::solve_offsets(&links, &priors, PRIOR_WEIGHT);
+
+    for l in leagues {
+        let off = offsets.get(&l.id).copied().unwrap_or(priors[&l.id]);
+        let n_matches = matches_per_league
+            .get(l.id.as_str())
+            .copied()
+            .unwrap_or(0.0);
+        let n_bridges = transfers_per_league
+            .get(l.id.as_str())
+            .copied()
+            .unwrap_or(0);
+        let source = if n_matches == 0.0 && n_bridges == 0 {
+            "a priori du tier (estimé)".to_string()
+        } else {
+            format!(
+                "{n_matches:.0} matchs entre ligues (pondérés), {n_bridges} transferts de joueurs"
+            )
+        };
+        tx.execute(
+            "INSERT INTO league_strength (league_id, offset, source) VALUES (?1, ?2, ?3)",
+            params![l.id, round2(off), source],
+        )?;
     }
 
     let params_ = Params {
-        year_weight: |y| if y >= 2025 { 1.0 } else { 0.5 },
+        year_weight: form_weight,
+        career_weight,
         prior_games: 12.0,
-        league_offset: offsets.iter().map(|(k, v)| (k.clone(), v.0)).collect(),
+        league_offset: offsets.clone(),
         default_offset: TIER_DEFAULT[2],
     };
     let rated = ratings::rate(&lines, &params_);
-
-    // Noms connus de chaque joueur Oracle's Elixir, et ses parties par ligue (2025 d'abord).
-    let mut names: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for r in rows.iter().filter(|r| Role::from_oe(&r.position).is_some()) {
-        names
-            .entry(r.player.to_lowercase())
-            .or_default()
-            .insert(player_key(r));
-    }
 
     // Rapprochement avec nos joueurs : même pseudo ; si plusieurs joueurs portent ce
     // pseudo, celui qui a joué dans la ligue du club, sinon celui qui a le plus joué.
@@ -298,10 +504,13 @@ pub fn import(
     let leagues_by_id: HashMap<&str, &LeagueConfig> =
         leagues.iter().map(|l| (l.id.as_str(), l)).collect();
     let mut sum = Summary {
+        years,
         games: lines.len(),
         rated: rated.len(),
         matched: 0,
         estimated: 0,
+        bridges: n_transfers,
+        cross_matches: cross.len(),
     };
     for (person, handle, role, league, birthdate) in &people {
         let candidates = names.get(&handle.to_lowercase());
@@ -327,7 +536,8 @@ pub fn import(
                 let tier = leagues_by_id.get(league.as_str()).map_or(3, |l| l.tier);
                 let off = offsets
                     .get(league)
-                    .map_or(TIER_DEFAULT[(tier as usize).clamp(1, 3) - 1], |o| o.0);
+                    .copied()
+                    .unwrap_or(TIER_DEFAULT[(tier as usize).clamp(1, 3) - 1]);
                 (unrated(role, league, off), "estimé")
             }
         };
@@ -336,85 +546,24 @@ pub fn import(
     Ok(sum)
 }
 
-/// Décalage par défaut d'une ligue sans match contre d'autres ligues, par tier,
-/// en écarts-types par rapport à la LEC. // estimé : les ligues tier 1 sans
-/// confrontation sont rares ; tier 2 et 3 d'après l'écart observé entre la LEC
-/// et les ligues régionales européennes (joueurs promus, résultats en EMEA Masters).
+/// A priori par tier, en écarts-types de niveau par rapport à la LEC : ne sert que
+/// pour une ligue que rien ne relie aux autres (ni match, ni transfert). // estimé
 const TIER_DEFAULT: [f64; 3] = [-0.5, -1.2, -1.8];
 
-/// Décalage de chaque ligue, à partir de la force mesurée (log-cote).
-/// Une log-cote de 1 (73 % de victoires) vaut 0,9 écart-type de niveau. // estimé
-fn league_offsets(
-    strength: &BTreeMap<String, f64>,
-    leagues: &[LeagueConfig],
-    oe_to_ours: &HashMap<String, String>,
-) -> BTreeMap<String, (f64, String)> {
-    let mut out = BTreeMap::new();
-    let lec_connected = strength.contains_key("LEC");
-    // Ligues hors du groupe de la LEC (ex. ligues régionales reliées par les EMEA Masters) :
-    // on recentre leur groupe sur le défaut de leur tier.
-    let tier_of = |oe: &str| {
-        let ours = oe_to_ours.get(oe).map(String::as_str).unwrap_or(oe);
-        leagues.iter().find(|l| l.id == ours).map(|l| l.tier)
-    };
-    let mut others: Vec<(&String, f64, u8)> = Vec::new();
-    for (oe, s) in strength {
-        let Some(tier) = tier_of(oe) else { continue };
-        if tier == 1 && lec_connected {
-            let ours = oe_to_ours.get(oe).cloned().unwrap_or(oe.clone());
-            out.insert(
-                ours,
-                (
-                    (0.9 * s).clamp(-2.5, 1.5),
-                    "matchs internationaux".to_string(),
-                ),
-            );
-        } else {
-            others.push((oe, *s, tier));
-        }
-    }
-    if !others.is_empty() {
-        let mean = others.iter().map(|o| o.1).sum::<f64>() / others.len() as f64;
-        for (oe, s, tier) in others {
-            let ours = oe_to_ours.get(oe).cloned().unwrap_or(oe.clone());
-            // Une ligue de tier 2 ou 3 ne passe pas au-dessus du défaut du tier supérieur :
-            // sans match contre la LEC, rien ne permet de la placer plus haut. // estimé
-            let t = (tier as usize).clamp(1, 3) - 1;
-            let cap = if t == 0 { 1.5 } else { TIER_DEFAULT[t - 1] };
-            let off = (TIER_DEFAULT[t] + 0.9 * (s - mean)).min(cap);
-            out.insert(
-                ours,
-                (
-                    off.clamp(-3.0, 1.5),
-                    "EMEA Masters et défaut du tier".to_string(),
-                ),
-            );
-        }
-    }
-    // Ligues académiques sans confrontation : la ligue principale de la région moins
-    // ACADEMY_GAP, jamais en dessous du défaut de leur tier.
-    for l in leagues {
-        if out.contains_key(&l.id) {
-            continue;
-        }
-        let tier_default = TIER_DEFAULT[(l.tier as usize).clamp(1, 3) - 1];
-        let parent = l.academy_of.as_ref().and_then(|p| out.get(p).map(|o| o.0));
-        let entry = match parent {
-            Some(p) => (
-                (p - ACADEMY_GAP).max(tier_default),
-                "ligue principale de la région moins l'écart académique (estimé)".to_string(),
-            ),
-            None => (tier_default, "défaut du tier (estimé)".to_string()),
-        };
-        out.insert(l.id.clone(), entry);
-    }
-    out
-}
+/// Poids de l'a priori, en « transferts » équivalents : très léger. // estimé
+const PRIOR_WEIGHT: f64 = 2.0;
 
-/// Écart entre une ligue principale et son académie, en écarts-types. // estimé :
-/// un titulaire de ligue principale domine nettement en académie, sans écart de
-/// deux tiers entiers (joueurs promus en LCK/LPL qui y tiennent leur place).
+/// Poids d'un match entre ligues face à un transfert de joueur. // estimé : les
+/// résultats directs entre ligues font foi autant qu'un transfert ; les transferts
+/// gardent un biais (un joueur promu progresse souvent, un joueur relégué décline).
+const MATCH_WEIGHT: f64 = 1.0;
+
+/// A priori d'une académie : la ligue principale de la région moins cet écart. // estimé
 const ACADEMY_GAP: f64 = 1.5;
+
+fn round2(v: f64) -> f64 {
+    (v * 100.0).round() / 100.0
+}
 
 /// Joueur sans partie dans Oracle's Elixir : tout est estimé au niveau de sa ligue.
 fn unrated(role: &str, league: &str, offset: f64) -> PlayerRating {
@@ -516,47 +665,5 @@ mod tests {
         assert_eq!(age_on_start(Some("2000-01-05")), Some(26));
         assert_eq!(age_on_start(Some("2000-01-06")), Some(25));
         assert_eq!(age_on_start(None), None);
-    }
-
-    #[test]
-    fn decalages_par_defaut_selon_le_tier() {
-        let leagues = vec![
-            LeagueConfig {
-                id: "LEC".into(),
-                name: "x".into(),
-                tier: 1,
-                oe: vec![],
-                academy_of: None,
-            },
-            LeagueConfig {
-                id: "LCK".into(),
-                name: "x".into(),
-                tier: 1,
-                oe: vec![],
-                academy_of: None,
-            },
-            LeagueConfig {
-                id: "LFL".into(),
-                name: "x".into(),
-                tier: 2,
-                oe: vec![],
-                academy_of: None,
-            },
-            LeagueConfig {
-                id: "HC".into(),
-                name: "x".into(),
-                tier: 3,
-                oe: vec![],
-                academy_of: None,
-            },
-        ];
-        let mut s = BTreeMap::new();
-        s.insert("LEC".to_string(), 0.0);
-        s.insert("LCK".to_string(), 0.8);
-        let o = league_offsets(&s, &leagues, &HashMap::new());
-        assert_eq!(o["LEC"].0, 0.0);
-        assert!(o["LCK"].0 > 0.5);
-        assert_eq!(o["LFL"].0, TIER_DEFAULT[1]);
-        assert_eq!(o["HC"].0, TIER_DEFAULT[2]);
     }
 }

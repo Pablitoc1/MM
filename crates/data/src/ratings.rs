@@ -3,13 +3,13 @@
 //! Aucune source ne note les joueurs : chaque attribut compare un joueur aux autres
 //! pros du même poste, puis tient compte du niveau de sa ligue, du nombre de parties
 //! jouées (peu de parties = note proche de la moyenne, et fourchette large) et de
-//! l'ancienneté des parties (2025 compte double par rapport à 2024).
+//! l'ancienneté des parties (2014 à 2025, les plus récentes comptent le plus).
 //! La méthode complète est décrite dans `docs/decisions/007-notes-des-joueurs.md`.
 //!
 //! Module pur : pas d'I/O, déterministe (tris explicites, pas de HashMap itérée
 //! pour produire un résultat).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Poste, comme dans Oracle's Elixir.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -165,8 +165,11 @@ pub struct PlayerRating {
 
 /// Paramètres de la méthode (voir la note de décision).
 pub struct Params {
-    /// Poids d'une partie selon l'année.
+    /// Poids d'une partie selon l'année, pour la forme actuelle.
     pub year_weight: fn(u16) -> f64,
+    /// Poids d'une partie selon l'année, pour ce qui se juge sur une carrière
+    /// (régularité, grands matchs, sang-froid).
+    pub career_weight: fn(u16) -> f64,
     /// Nombre de parties « fictives » à la moyenne de la ligue (lissage).
     pub prior_games: f64,
     /// Décalage de niveau par ligue, en écarts-types (0 = niveau de la LEC).
@@ -186,7 +189,7 @@ const SD_100: f64 = 10.0;
 pub const RANGE_SHOWN: f64 = 1.5;
 
 /// Statistiques par minute ou par partie, pour un joueur.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Metric {
     Kda,
     KillParticipation,
@@ -264,9 +267,13 @@ fn metric(g: &GameLine, m: Metric) -> Option<f64> {
 }
 
 /// Recette de chaque attribut mesuré : (métrique, poids). Poids négatif = moins c'est mieux.
-fn recipe(a: Attr) -> &'static [(Metric, f64)] {
+/// Le support ne farme pas : son laning se juge sans l'écart de CS.
+fn recipe(a: Attr, role: Role) -> &'static [(Metric, f64)] {
     use Metric::*;
     match a {
+        Attr::Laning if role == Role::Support => {
+            &[(GoldDiff15, 0.3), (XpDiff15, 0.4), (Deaths15, -0.3)]
+        }
         Attr::Mechanics => &[(Kda, 0.3), (DamagePerGold, 0.35), (DamagePerMin, 0.35)],
         Attr::Laning => &[
             (GoldDiff15, 0.35),
@@ -351,67 +358,114 @@ fn mean_sd(values: &[(f64, f64)]) -> Option<(f64, f64)> {
 /// Ce qu'on retient d'un joueur avant de le noter.
 struct Profile {
     role: Role,
+    /// Ligue la plus jouée récemment (affichage, rapprochement).
     league: String,
+    /// Parties au poste, toutes années.
     games: u32,
-    /// Somme des poids des parties (année).
+    /// Somme des poids des parties (forme récente) : sert au lissage.
     weight: f64,
+    /// Niveau moyen des ligues où il a joué, pondéré comme ses parties.
+    offset: f64,
+    /// Chaque métrique, en écarts-types par rapport aux joueurs de sa ligue et de l'année.
     metrics: BTreeMap<Metric, f64>,
-    /// Score de chaque partie (pour régularité, grands matchs, sang-froid).
+    /// Score de chaque partie (régularité, grands matchs, sang-froid), poids de carrière.
     game_scores: Vec<(f64, f64, bool, Option<f64>)>, // (score, poids, grand match, écart d'or équipe à 15)
     champions: BTreeMap<String, u32>,
 }
 
-/// Calcule les notes de tous les joueurs (clé = identifiant du joueur dans `lines`).
-pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRating> {
-    // 1. Regroupe les parties par joueur ; poste et ligue = les plus joués.
-    let mut by_player: BTreeMap<&str, Vec<&GameLine>> = BTreeMap::new();
-    for g in lines {
-        by_player.entry(&g.player).or_default().push(g);
-    }
+const METRICS: [Metric; 20] = [
+    Metric::Kda,
+    Metric::KillParticipation,
+    Metric::DamageShare,
+    Metric::DamagePerMin,
+    Metric::DamagePerGold,
+    Metric::GoldShare,
+    Metric::CsPerMin,
+    Metric::DeathsPerMin,
+    Metric::LateDeathsPerMin,
+    Metric::VisionPerMin,
+    Metric::WardsPerMin,
+    Metric::WardsKilledPerMin,
+    Metric::ControlWardsPerMin,
+    Metric::GoldDiff15,
+    Metric::CsDiff15,
+    Metric::XpDiff15,
+    Metric::Deaths15,
+    Metric::KillsAssists15,
+    Metric::FirstBlood,
+    Metric::WinRate,
+];
 
-    // Moyenne et écart-type de chaque métrique par poste, partie par partie,
-    // pour standardiser le score d'une partie.
-    let metrics_all = [
-        Metric::Kda,
-        Metric::KillParticipation,
-        Metric::DamageShare,
-        Metric::DamagePerMin,
-        Metric::DamagePerGold,
-        Metric::GoldShare,
-        Metric::CsPerMin,
-        Metric::DeathsPerMin,
-        Metric::LateDeathsPerMin,
-        Metric::VisionPerMin,
-        Metric::WardsPerMin,
-        Metric::WardsKilledPerMin,
-        Metric::ControlWardsPerMin,
-        Metric::GoldDiff15,
-        Metric::CsDiff15,
-        Metric::XpDiff15,
-        Metric::Deaths15,
-        Metric::KillsAssists15,
-        Metric::FirstBlood,
-        Metric::WinRate,
-    ];
-    let mut per_game: BTreeMap<(Role, Metric), Vec<(f64, f64)>> = BTreeMap::new();
-    for g in lines {
-        let w = (params.year_weight)(g.year);
-        for m in [
-            Metric::DamageShare,
-            Metric::KillParticipation,
-            Metric::DeathsPerMin,
-            Metric::GoldDiff15,
-        ] {
-            if let Some(v) = metric(g, m) {
-                per_game.entry((g.role, m)).or_default().push((v, w));
+/// Parties minimum d'une ligue sur une année et un poste pour la prendre comme
+/// référence ; en dessous, on compare à tous les pros du poste cette année-là.
+const MIN_GROUP: usize = 40;
+
+/// Ramène chaque statistique d'une partie en écarts-types par rapport aux parties
+/// de la même ligue, de la même année et au même poste. Une ligue, une année et un
+/// méta différents ne faussent plus la comparaison ; le niveau de la ligue est
+/// ajouté ensuite, à part.
+type Key = (u16, Role, Metric);
+
+struct Standardizer {
+    /// Par ligue, puis (année, poste, métrique).
+    group: HashMap<String, HashMap<Key, (f64, f64)>>,
+    fallback: HashMap<Key, (f64, f64)>,
+}
+
+impl Standardizer {
+    fn new(lines: &[GameLine]) -> Self {
+        let mut group: HashMap<String, HashMap<Key, Vec<(f64, f64)>>> = HashMap::new();
+        let mut fallback: HashMap<Key, Vec<(f64, f64)>> = HashMap::new();
+        for g in lines {
+            for m in METRICS {
+                if let Some(v) = metric(g, m) {
+                    if !group.contains_key(&g.league) {
+                        group.insert(g.league.clone(), HashMap::new());
+                    }
+                    group
+                        .get_mut(&g.league)
+                        .unwrap()
+                        .entry((g.year, g.role, m))
+                        .or_default()
+                        .push((v, 1.0));
+                    fallback
+                        .entry((g.year, g.role, m))
+                        .or_default()
+                        .push((v, 1.0));
+                }
             }
         }
+        Standardizer {
+            group: group
+                .into_iter()
+                .map(|(l, by_key)| {
+                    let stats = by_key
+                        .into_iter()
+                        .filter(|(_, v)| v.len() >= MIN_GROUP)
+                        .filter_map(|(k, v)| mean_sd(&v).map(|s| (k, s)))
+                        .collect();
+                    (l, stats)
+                })
+                .collect(),
+            fallback: fallback
+                .into_iter()
+                .filter_map(|(k, v)| mean_sd(&v).map(|s| (k, s)))
+                .collect(),
+        }
     }
-    let per_game_stats: BTreeMap<(Role, Metric), (f64, f64)> = per_game
-        .into_iter()
-        .filter_map(|(k, v)| mean_sd(&v).map(|s| (k, s)))
-        .collect();
-    let game_score = |g: &GameLine| -> f64 {
+
+    fn z(&self, g: &GameLine, m: Metric) -> Option<f64> {
+        let v = metric(g, m)?;
+        let (mu, sd) = self
+            .group
+            .get(&g.league)
+            .and_then(|by_key| by_key.get(&(g.year, g.role, m)))
+            .or_else(|| self.fallback.get(&(g.year, g.role, m)))?;
+        Some(((v - mu) / sd).clamp(-4.0, 4.0))
+    }
+
+    /// Score d'une partie : part des dégâts, participation, morts, écart d'or à 15.
+    fn game_score(&self, g: &GameLine) -> f64 {
         let parts = [
             (Metric::DamageShare, 1.0),
             (Metric::KillParticipation, 1.0),
@@ -420,8 +474,8 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
         ];
         let (mut s, mut n) = (0.0, 0.0);
         for (m, sign) in parts {
-            if let (Some(v), Some((mu, sd))) = (metric(g, m), per_game_stats.get(&(g.role, m))) {
-                s += sign * (v - mu) / sd;
+            if let Some(z) = self.z(g, m) {
+                s += sign * z;
                 n += 1.0;
             }
         }
@@ -430,8 +484,64 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
         } else {
             0.0
         }
+    }
+}
+
+/// Saison d'un joueur dans une ligue : niveau par rapport aux joueurs de cette ligue.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Season {
+    pub player: String,
+    pub league: String,
+    pub year: u16,
+    pub games: u32,
+    /// Écarts-types au-dessus de la moyenne de la ligue (score moyen par partie).
+    pub z: f64,
+}
+
+/// Saisons d'au moins `min_games` parties. Sert à mesurer l'écart entre deux ligues
+/// grâce aux joueurs qui sont passés de l'une à l'autre.
+pub fn seasons(lines: &[GameLine], min_games: u32) -> Vec<Season> {
+    let std = Standardizer::new(lines);
+    let mut acc: BTreeMap<(&str, &str, u16), (f64, u32)> = BTreeMap::new();
+    for g in lines {
+        let e = acc.entry((&g.player, &g.league, g.year)).or_default();
+        e.0 += std.game_score(g);
+        e.1 += 1;
+    }
+    let raw: Vec<(&str, &str, u16, u32, f64)> = acc
+        .into_iter()
+        .filter(|(_, (_, n))| *n >= min_games)
+        .map(|((p, l, y), (s, n))| (p, l, y, n, s / n as f64))
+        .collect();
+    // Un écart-type = la dispersion des saisons des joueurs (même échelle que le niveau).
+    let sd = mean_sd(&raw.iter().map(|r| (r.4, 1.0)).collect::<Vec<_>>()).map_or(1.0, |s| s.1);
+    raw.into_iter()
+        .map(|(p, l, y, n, s)| Season {
+            player: p.to_string(),
+            league: l.to_string(),
+            year: y,
+            games: n,
+            z: s / sd,
+        })
+        .collect()
+}
+
+/// Calcule les notes de tous les joueurs (clé = identifiant du joueur dans `lines`).
+pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRating> {
+    let std = Standardizer::new(lines);
+    let offset_of = |league: &str| {
+        params
+            .league_offset
+            .get(league)
+            .copied()
+            .unwrap_or(params.default_offset)
     };
 
+    // 1. Regroupe les parties par joueur ; poste et ligue = les plus joués récemment.
+    let mut by_player: BTreeMap<&str, Vec<&GameLine>> = BTreeMap::new();
+    for g in lines {
+        by_player.entry(&g.player).or_default().push(g);
+    }
     let mut profiles: BTreeMap<&str, Profile> = BTreeMap::new();
     for (player, games) in &by_player {
         let mut role_count: BTreeMap<Role, f64> = BTreeMap::new();
@@ -444,20 +554,31 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
         let role = *max_key(&role_count);
         let league = max_key(&league_count).to_string();
         let games: Vec<&&GameLine> = games.iter().filter(|g| g.role == role).collect();
+        let weight: f64 = games.iter().map(|g| (params.year_weight)(g.year)).sum();
+        if weight <= 0.0 {
+            continue;
+        }
+        let offset = games
+            .iter()
+            .map(|g| offset_of(&g.league) * (params.year_weight)(g.year))
+            .sum::<f64>()
+            / weight;
 
         let mut metrics = BTreeMap::new();
-        for m in metrics_all {
+        for m in METRICS {
             let vals: Vec<(f64, f64)> = games
                 .iter()
-                .filter_map(|g| metric(g, m).map(|v| (v, (params.year_weight)(g.year))))
+                .filter_map(|g| std.z(g, m).map(|v| (v, (params.year_weight)(g.year))))
                 .collect();
             let w: f64 = vals.iter().map(|v| v.1).sum();
             if w > 0.0 {
                 metrics.insert(m, vals.iter().map(|v| v.0 * v.1).sum::<f64>() / w);
             }
         }
+        // Pool : la dernière année jouée.
+        let last = games.iter().map(|g| g.year).max().unwrap_or(0);
         let mut champions = BTreeMap::new();
-        for g in games.iter().filter(|g| g.year == max_year(lines)) {
+        for g in games.iter().filter(|g| g.year == last) {
             *champions.entry(g.champion.clone()).or_default() += 1;
         }
         profiles.insert(
@@ -466,14 +587,15 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
                 role,
                 league,
                 games: games.len() as u32,
-                weight: games.iter().map(|g| (params.year_weight)(g.year)).sum(),
+                weight,
+                offset,
                 metrics,
                 game_scores: games
                     .iter()
                     .map(|g| {
                         (
-                            game_score(g),
-                            (params.year_weight)(g.year),
+                            std.game_score(g),
+                            (params.career_weight)(g.year),
                             g.big_match,
                             g.team_gold_diff_15,
                         )
@@ -486,7 +608,7 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
 
     // 2. Une valeur brute par attribut et par joueur.
     let mut raw: BTreeMap<(Attr, &str), f64> = BTreeMap::new();
-    // Référence par poste : joueurs avec assez de parties.
+    // Référence par poste : joueurs avec assez de parties récentes.
     let reference = |p: &Profile| p.weight >= 10.0;
     for role in Role::ALL {
         let in_role: Vec<(&str, &Profile)> = profiles
@@ -494,29 +616,13 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             .filter(|(_, p)| p.role == role)
             .map(|(k, p)| (*k, p))
             .collect();
-        // Standardisation de chaque métrique sur le poste.
-        let mut z: BTreeMap<(Metric, &str), f64> = BTreeMap::new();
-        for m in metrics_all {
-            let vals: Vec<(f64, f64)> = in_role
-                .iter()
-                .filter(|(_, p)| reference(p))
-                .filter_map(|(_, p)| p.metrics.get(&m).map(|v| (*v, p.weight)))
-                .collect();
-            if let Some((mu, sd)) = mean_sd(&vals) {
-                for (k, p) in &in_role {
-                    if let Some(v) = p.metrics.get(&m) {
-                        z.insert((m, k), (v - mu) / sd);
-                    }
-                }
-            }
-        }
         for a in Attr::ALL {
-            let rec = recipe(a);
+            let rec = recipe(a, role);
             if !rec.is_empty() {
-                for (k, _) in &in_role {
+                for (k, p) in &in_role {
                     let (mut s, mut wsum) = (0.0, 0.0);
                     for (m, w) in rec {
-                        if let Some(v) = z.get(&(*m, *k)) {
+                        if let Some(v) = p.metrics.get(m) {
                             s += w * v;
                             wsum += w.abs();
                         }
@@ -527,7 +633,7 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
                 }
             }
         }
-        // Attributs tirés du score de chaque partie.
+        // Attributs tirés du score de chaque partie, sur toute la carrière.
         for (k, p) in &in_role {
             let all: Vec<(f64, f64)> = p.game_scores.iter().map(|s| (s.0, s.1)).collect();
             if let Some((mu, sd)) = mean_sd(&all) {
@@ -576,13 +682,6 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
 
     // 3. Restandardise chaque attribut par poste, ajoute le niveau de la ligue, lisse.
     let mut out = BTreeMap::new();
-    let offset_of = |league: &str| {
-        params
-            .league_offset
-            .get(league)
-            .copied()
-            .unwrap_or(params.default_offset)
-    };
     let mut attr_stats: BTreeMap<(Role, Attr), (f64, f64)> = BTreeMap::new();
     for role in Role::ALL {
         for a in Attr::ALL {
@@ -601,8 +700,8 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             (Some(v), Some((mu, sd))) => Some((v - mu) / sd),
             _ => None,
         };
-    // Niveau : moyenne pondérée des attributs mesurés, elle-même ramenée à un
-    // écart-type de 1 sur le poste (une moyenne de notes resserre l'échelle).
+    // Niveau : moyenne pondérée des attributs mesurés du poste, sur la même échelle
+    // que les attributs (un niveau se lit d'un coup d'œil à partir de la fiche).
     let composite = |k: &str, p: &Profile| {
         let (mut s, mut w) = (0.0, 0.0);
         for (a, wt) in level_weights(p.role) {
@@ -613,26 +712,15 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
         }
         (w > 0.0).then(|| s / w)
     };
-    let mut level_stats: BTreeMap<Role, (f64, f64)> = BTreeMap::new();
-    for role in Role::ALL {
-        let vals: Vec<(f64, f64)> = profiles
-            .iter()
-            .filter(|(_, p)| p.role == role && reference(p))
-            .filter_map(|(k, p)| composite(k, p).map(|c| (c, p.weight)))
-            .collect();
-        if let Some(s) = mean_sd(&vals) {
-            level_stats.insert(role, s);
-        }
-    }
     for (k, p) in &profiles {
-        let off = offset_of(&p.league);
+        let off = p.offset;
         let shrink = p.weight / (p.weight + params.prior_games);
         let half = SD_20 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
         let mut attrs = BTreeMap::new();
         for a in Attr::ALL {
             let score = match measured(a, k, p) {
                 Some(zr) => {
-                    let z = off + zr * shrink;
+                    let z = off + zr * shrink * transfer(off);
                     let value = to20(z);
                     Score {
                         value,
@@ -645,9 +733,9 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
             };
             attrs.insert(a, score);
         }
-        let z = match (composite(k, p), level_stats.get(&p.role)) {
-            (Some(c), Some((mu, sd))) => off + (c - mu) / sd * shrink,
-            _ => off,
+        let z = match composite(k, p) {
+            Some(c) => off + c * shrink * transfer(off),
+            None => off,
         };
         let level = (MID_100 + SD_100 * z).clamp(25.0, 99.0);
         let half100 = SD_100 * (params.prior_games / (p.weight + params.prior_games)).sqrt();
@@ -670,6 +758,14 @@ pub fn rate(lines: &[GameLine], params: &Params) -> BTreeMap<String, PlayerRatin
     out
 }
 
+/// Part de l'écart avec les joueurs de sa ligue qu'on garde quand on passe à
+/// l'échelle de la LEC. Dans une ligue plus faible, dominer ses adversaires dit
+/// moins (l'équipe, le contexte et le hasard des oppositions y pèsent plus) :
+/// 1 sd de ligue en dessous de la LEC → 75 %, jamais moins de 50 %. // estimé
+fn transfer(offset: f64) -> f64 {
+    (1.0 + 0.25 * offset.min(0.0)).max(0.5)
+}
+
 fn to20(z: f64) -> f64 {
     (MID_20 + SD_20 * z).clamp(1.0, 20.0)
 }
@@ -679,10 +775,10 @@ fn to20(z: f64) -> f64 {
 /// Shotcalling, communication et professionnalisme ne se mesurent pas : on part
 /// de l'expérience (nombre de parties pro) et du poste. // estimé
 fn estimated(a: Attr, p: &Profile, off: f64) -> Score {
-    let experience = ((p.games as f64) / 60.0).min(2.0); // 0 à 2 saisons pleines
+    let experience = ((p.games as f64) / 100.0).min(4.0); // 0 à 4 saisons pleines
     let bonus = match a {
         Attr::Shotcalling => {
-            experience * 0.4
+            experience * 0.25
                 + match p.role {
                     Role::Support => 0.5,
                     Role::Jungle => 0.4,
@@ -690,7 +786,7 @@ fn estimated(a: Attr, p: &Profile, off: f64) -> Score {
                     _ => -0.2,
                 }
         }
-        Attr::Communication | Attr::Professionalism => experience * 0.3,
+        Attr::Communication | Attr::Professionalism => experience * 0.2,
         _ => 0.0,
     };
     let value = to20(off + bonus);
@@ -720,15 +816,11 @@ fn max_key<K: Ord>(m: &BTreeMap<K, f64>) -> &K {
     best.expect("au moins une partie").0
 }
 
-fn max_year(lines: &[GameLine]) -> u16 {
-    lines.iter().map(|g| g.year).max().unwrap_or(0)
-}
-
 /// Niveau relatif des ligues, à partir des matchs entre équipes de ligues
 /// différentes (compétitions internationales, EMEA Masters…).
 /// Modèle de Bradley-Terry : renvoie, pour chaque ligue reliée aux autres, une
-/// force en log-cote, la LEC valant 0.
-pub fn league_strength(matches: &[(String, String, bool)]) -> BTreeMap<String, f64> {
+/// force en log-cote, la LEC valant 0. Chaque match : (A, B, A gagne, poids).
+pub fn league_strength(matches: &[(String, String, bool, f64)]) -> BTreeMap<String, f64> {
     let mut leagues: Vec<&str> = matches
         .iter()
         .flat_map(|m| [m.0.as_str(), m.1.as_str()])
@@ -736,24 +828,82 @@ pub fn league_strength(matches: &[(String, String, bool)]) -> BTreeMap<String, f
     leagues.sort_unstable();
     leagues.dedup();
     let mut s: BTreeMap<&str, f64> = leagues.iter().map(|l| (*l, 0.0)).collect();
-    // Montée de gradient avec un léger rappel vers 0 (évite l'infini pour une ligue invaincue).
-    for _ in 0..500 {
+    // Newton coordonnée par coordonnée, avec un léger rappel vers 0 (évite l'infini
+    // pour une ligue invaincue).
+    for _ in 0..200 {
         let mut grad: BTreeMap<&str, f64> = leagues.iter().map(|l| (*l, 0.0)).collect();
-        for (a, b, a_won) in matches {
+        let mut hess: BTreeMap<&str, f64> = leagues.iter().map(|l| (*l, 0.5)).collect();
+        for (a, b, a_won, w) in matches {
             let p = 1.0 / (1.0 + (s[b.as_str()] - s[a.as_str()]).exp());
             let y = if *a_won { 1.0 } else { 0.0 };
-            *grad.get_mut(a.as_str()).unwrap() += y - p;
-            *grad.get_mut(b.as_str()).unwrap() -= y - p;
+            *grad.get_mut(a.as_str()).unwrap() += w * (y - p);
+            *grad.get_mut(b.as_str()).unwrap() -= w * (y - p);
+            *hess.get_mut(a.as_str()).unwrap() += w * p * (1.0 - p);
+            *hess.get_mut(b.as_str()).unwrap() += w * p * (1.0 - p);
         }
         for l in &leagues {
             let g = grad[l] - 0.5 * s[l];
-            *s.get_mut(l).unwrap() += 0.02 * g;
+            *s.get_mut(l).unwrap() += 0.5 * g / hess[l];
         }
     }
     let base = s.get("LEC").copied().unwrap_or(0.0);
     s.into_iter()
         .map(|(k, v)| (k.to_string(), v - base))
         .collect()
+}
+
+/// Une mesure de l'écart entre deux ligues : décalage(A) − décalage(B) ≈ écart, avec
+/// un poids. Vient des matchs entre leurs équipes ou des joueurs passés de l'une à
+/// l'autre (même niveau des deux côtés : décalage(A) + zA = décalage(B) + zB).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LeagueLink {
+    pub a: String,
+    pub b: String,
+    pub gap: f64,
+    pub weight: f64,
+}
+
+/// Une log-cote de 1 entre deux ligues (73 % de victoires) vaut 0,9 écart-type de
+/// niveau de joueur. // estimé : ordre de grandeur des écarts de niveau entre ligues.
+pub const LOGODDS_TO_LEVEL: f64 = 0.9;
+
+/// Décalage de chaque ligue par rapport à la LEC, en écarts-types de niveau : moindres
+/// carrés sur tous les liens, plus un a priori par ligue (tier), très léger.
+pub fn solve_offsets(
+    links: &[LeagueLink],
+    priors: &BTreeMap<String, f64>,
+    prior_weight: f64,
+) -> BTreeMap<String, f64> {
+    let mut leagues: Vec<&str> = priors.keys().map(String::as_str).collect();
+    for l in links {
+        leagues.push(&l.a);
+        leagues.push(&l.b);
+    }
+    leagues.sort_unstable();
+    leagues.dedup();
+    let prior_of = |l: &str| priors.get(l).copied().unwrap_or(-1.8);
+    let mut off: BTreeMap<&str, f64> = leagues.iter().map(|l| (*l, prior_of(l))).collect();
+    off.insert("LEC", 0.0);
+    // Gauss-Seidel : chaque ligue prend la moyenne pondérée de ce que disent ses liens.
+    for _ in 0..500 {
+        for l in &leagues {
+            if *l == "LEC" {
+                continue;
+            }
+            let (mut num, mut den) = (prior_weight * prior_of(l), prior_weight);
+            for k in links {
+                if k.a == *l {
+                    num += k.weight * (off[k.b.as_str()] + k.gap);
+                    den += k.weight;
+                } else if k.b == *l {
+                    num += k.weight * (off[k.a.as_str()] - k.gap);
+                    den += k.weight;
+                }
+            }
+            off.insert(l, num / den);
+        }
+    }
+    off.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
 #[cfg(test)]
@@ -803,6 +953,7 @@ mod tests {
         league_offset.insert("LFL".to_string(), -0.8);
         Params {
             year_weight: |y| if y >= 2025 { 1.0 } else { 0.5 },
+            career_weight: |_| 1.0,
             prior_games: 12.0,
             league_offset,
             default_offset: -1.5,
@@ -893,12 +1044,49 @@ mod tests {
     fn force_des_ligues() {
         let mut m = Vec::new();
         for i in 0..30 {
-            m.push(("LCK".to_string(), "LEC".to_string(), i % 10 < 7));
-            m.push(("LEC".to_string(), "LCS".to_string(), i % 10 < 6));
+            m.push(("LCK".to_string(), "LEC".to_string(), i % 10 < 7, 1.0));
+            m.push(("LEC".to_string(), "LCS".to_string(), i % 10 < 6, 1.0));
         }
         let s = league_strength(&m);
         assert_eq!(s["LEC"], 0.0);
         assert!(s["LCK"] > 0.3);
         assert!(s["LCS"] < -0.1);
+    }
+
+    #[test]
+    fn ecart_entre_ligues_par_les_liens() {
+        let link = |a: &str, b: &str, gap: f64, weight: f64| LeagueLink {
+            a: a.into(),
+            b: b.into(),
+            gap,
+            weight,
+        };
+        // LCK au-dessus de la LEC (matchs), LFL en dessous (transferts), NLC reliée à la LFL.
+        let links = [
+            link("LCK", "LEC", 0.9, 50.0),
+            link("LEC", "LFL", 0.5, 30.0),
+            link("LFL", "NLC", 0.4, 20.0),
+        ];
+        let mut priors = BTreeMap::new();
+        priors.insert("LEC".to_string(), 0.0);
+        priors.insert("LTS".to_string(), -1.2);
+        priors.insert("LCK".to_string(), -0.5);
+        priors.insert("LFL".to_string(), -1.2);
+        priors.insert("NLC".to_string(), -1.2);
+        let o = solve_offsets(&links, &priors, 2.0);
+        assert_eq!(o["LEC"], 0.0);
+        // L'a priori, léger, ne déplace presque pas ce que disent les liens.
+        assert!((o["LCK"] - 0.9).abs() < 0.1, "{}", o["LCK"]);
+        assert!((o["LFL"] + 0.5).abs() < 0.1, "{}", o["LFL"]);
+        assert!((o["NLC"] + 0.9).abs() < 0.15, "{}", o["NLC"]);
+        // Sans aucun lien : l'a priori du tier.
+        assert_eq!(o["LTS"], -1.2);
+    }
+
+    #[test]
+    fn dominer_une_ligue_faible_compte_moins() {
+        assert_eq!(transfer(0.5), 1.0);
+        assert_eq!(transfer(-1.0), 0.75);
+        assert_eq!(transfer(-3.0), 0.5);
     }
 }
