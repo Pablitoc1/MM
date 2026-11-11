@@ -1,4 +1,4 @@
-# 009 · Moteur : carte, vagues et farm (M3)
+# 010 · Moteur : carte, vagues et farm (M3)
 
 Date : 11 novembre 2026. Code : `crates/engine` (moteur), `crates/world/src/lineup.rs`
 (préparation du match depuis la base), `crates/world/src/bin/sim.rs` (`just sim`).
