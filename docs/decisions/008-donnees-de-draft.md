@@ -35,7 +35,7 @@ dans la base existante, sans réseau, en une dizaine de secondes.
 - **Saison 2026** : chaque patch du calendrier reprend la vraie méta pro de ce patch
   (`champion_meta`). C'est la force des champions décidée par Riot, pas l'avenir des
   joueurs : les notes et les pools restent arrêtés à fin 2025.
-- **À partir de 2027** (proposé, à valider, arrive avec les patches du jeu en M9) : le
+- **À partir de 2027** (validé par Yahia, arrive avec les patches du jeu en M9) : le
   jeu génère un patch toutes les deux semaines. Les champions trop présents sont
   affaiblis, les oubliés renforcés, avec une part de hasard (`SimRng`). L'ampleur et la
   fréquence des changements reprennent ce qu'on mesure entre deux patches réels
