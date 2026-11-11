@@ -3,7 +3,8 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-M0 · Socle du projet : en attente de validation par Yahia.
+Aucun. M0 · Socle du projet validé par Yahia le 11 novembre 2026 (installateur testé sur son ordinateur).
+Prochain jalon : M1, à lancer quand Yahia dit « go M1 ».
 
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
