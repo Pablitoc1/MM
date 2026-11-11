@@ -31,10 +31,20 @@ dans la base existante, sans réseau, en une dizaine de secondes.
   A = 12 premiers, B = 13 à 35, C = 36 à 70, D = le reste.
 - Demi-vie de la maîtrise : un an.
 
+## Méta pendant la partie (choix de Yahia, 11 novembre 2026)
+- **Saison 2026** : chaque patch du calendrier reprend la vraie méta pro de ce patch
+  (`champion_meta`). C'est la force des champions décidée par Riot, pas l'avenir des
+  joueurs : les notes et les pools restent arrêtés à fin 2025.
+- **À partir de 2027** (proposé, à valider, arrive avec les patches du jeu en M9) : le
+  jeu génère un patch toutes les deux semaines. Les champions trop présents sont
+  affaiblis, les oubliés renforcés, avec une part de hasard (`SimRng`). L'ampleur et la
+  fréquence des changements reprennent ce qu'on mesure entre deux patches réels
+  2016-2026. Chaque patch modifie un peu la force du champion dans le moteur. La méta
+  suit les résultats des parties simulées, repérée plus vite par les clubs qui ont un
+  bon analyste. Pas de nouveaux champions pour l'instant.
+
 ## Pas encore là
 - Part de dégâts physiques et magiques (Data Dragon, champ `info`) et styles des
   champions (engage, poke, peel, split, teamfight) : avec les règles et l'IA de draft.
-- Choix de Yahia en attente : la saison 2026 du jeu suit-elle la vraie méta de chaque
-  patch 2026, ou seulement la méta connue fin 2025 ? Les deux sont importées.
 - « Locke », champion sorti en 2026, est absent de Data Dragon 16.1.1 : ses parties sont
   ignorées.
