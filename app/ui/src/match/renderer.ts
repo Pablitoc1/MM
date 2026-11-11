@@ -5,6 +5,7 @@ import {
 } from 'pixi.js';
 import { ALCOVES, CAMPS, STRUCTURES, toUnit, type CampKind, type Point } from './map';
 import type { MatchReplay, TeamIndex } from './replay';
+import { championIcon } from '../api';
 import { formatClock, type CampView, type MatchState } from './state';
 
 /** Couleurs lues dans tokens.css au démarrage (Pixi ne lit pas le CSS lui-même). */
@@ -28,20 +29,27 @@ function readPalette(): Palette {
   return { ...out, team: [out.us, out.them] };
 }
 
-const ASSET_ROOT = '/match';
+/** Images livrées avec la vue (minimap, camps, sbires), servies par Vite. */
+const LOCAL = import.meta.glob('./assets/**/*.{png,webp}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+
 const CAMP_ICON: Record<CampKind, string> = {
   blue: 'blue', red: 'red', gromp: 'gromp', wolves: 'wolves', raptors: 'raptors',
   krugs: 'krugs', scuttle: 'scuttle', dragon: 'dragon', baron: 'baron',
 };
 
-export function assetUrls(replay: MatchReplay): string[] {
+/** Adresse d'une image : icônes de champions de la base (M1), le reste livré avec la vue. */
+function urlOf(path: string): string {
+  if (path.startsWith('champions/')) return championIcon(path.slice('champions/'.length, -'.png'.length));
+  const url = LOCAL[`./assets/${path}`];
+  if (!url) throw new Error(`image manquante : ${path}`);
+  return url;
+}
+
+export function assetPaths(replay: MatchReplay): string[] {
   return [
-    `${ASSET_ROOT}/map11.png`,
-    `${ASSET_ROOT}/minion-blue.webp`,
-    `${ASSET_ROOT}/minion-red.webp`,
-    `${ASSET_ROOT}/camps/voidgrubs.webp`,
-    ...Object.values(CAMP_ICON).map((k) => `${ASSET_ROOT}/camps/${k}.webp`),
-    ...replay.champions.map((c) => `${ASSET_ROOT}/champions/${c.champion}.png`),
+    'map11.png', 'minion-blue.webp', 'minion-red.webp', 'camps/voidgrubs.webp',
+    ...Object.values(CAMP_ICON).map((k) => `camps/${k}.webp`),
+    ...replay.champions.map((c) => `champions/${c.champion}.png`),
   ];
 }
 
@@ -167,14 +175,14 @@ export class MatchRenderer {
     this.app.canvas.setAttribute('role', 'img');
     this.app.canvas.setAttribute('aria-label', 'Carte du match en direct');
     host.appendChild(this.app.canvas);
-    const urls = assetUrls(this.replay);
-    const loaded = await Assets.load(urls);
-    for (const u of urls) this.textures.set(u, loaded[u] as Texture);
+    const paths = assetPaths(this.replay);
+    const loaded = await Assets.load(paths.map(urlOf));
+    for (const p of paths) this.textures.set(p, loaded[urlOf(p)] as Texture);
     this.build();
   }
 
   private tex(path: string): Texture {
-    const t = this.textures.get(`${ASSET_ROOT}/${path}`);
+    const t = this.textures.get(path);
     if (!t) throw new Error(`image manquante : ${path}`);
     return t;
   }
