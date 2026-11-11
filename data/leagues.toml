@@ -4,6 +4,7 @@
 # qui commence après le 15 décembre 2025, sinon le dernier de 2025.
 # Liste établie à la main (Leaguepedia ne classe pas les ligues en tiers) :
 # voir docs/decisions/005-ligues-et-tiers.md. Modifiable librement.
+# `oe` = code de la ligue dans Oracle's Elixir quand il diffère de `id`.
 # Absentes car disparues en 2026 : LVP SuperLiga (remplacée par la LES),
 # LFL Division 2 (fondue dans la LFL), Liga Valkyria (format de qualifications).
 
@@ -26,11 +27,13 @@ tier = 1
 id = "LCS"
 name = "League of Legends Championship Series"
 tier = 1
+oe = ["LTA N"]
 
 [[league]]
 id = "CBLOL"
 name = "Circuit Brazilian League of Legends"
 tier = 1
+oe = ["LTA S"]
 
 [[league]]
 id = "LCP"
@@ -108,6 +111,7 @@ tier = 2
 id = "LCKCL"
 name = "LCK Challengers League"
 tier = 2
+oe = ["LCKC"]
 
 [[league]]
 id = "LDL"

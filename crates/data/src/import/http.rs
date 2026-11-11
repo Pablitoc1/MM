@@ -69,6 +69,11 @@ impl Fetcher {
         Err(format!("échec du téléchargement {url} : {last_err:?}").into())
     }
 
+    /// Oublie la réponse gardée en cache pour `url` (réponse invalide).
+    pub fn forget(&self, url: &str) {
+        let _ = std::fs::remove_file(self.cache.join(format!("{:x}", md5::compute(url))));
+    }
+
     pub fn get_json(&self, url: &str) -> Result<serde_json::Value> {
         Ok(serde_json::from_slice(&self.get(url)?)?)
     }
