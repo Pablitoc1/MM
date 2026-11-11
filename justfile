@@ -35,9 +35,10 @@ seed:
 seed-draft:
     cargo run --release -p mm-data --features import --bin seed -- --draft
 
-# Simule des matchs sans interface (arrive en M3/M4). Exemple : just sim KC G2 --n 1000
+# Simule des parties sans interface et les compare à la LEC 2025.
+# Exemple : just sim KC G2 --n 100 --report docs/demo/M3/rapport-farm.md --replay partie.json
 sim *args:
-    @echo "Simulation : arrive au jalon M3. Arguments reçus : {{args}}"
+    cargo run --release -q -p mm-world --bin sim -- {{args}}
 
 # Prépare la démo de validation d'un jalon (captures dans docs/demo/<jalon>/).
 demo milestone:

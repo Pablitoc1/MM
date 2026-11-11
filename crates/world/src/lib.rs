@@ -1,6 +1,7 @@
 //! Le monde du jeu : calendrier, gestion des clubs, IA, sauvegardes.
 
 pub mod date;
+pub mod lineup;
 
 pub use date::GameDate;
 

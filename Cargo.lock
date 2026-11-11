@@ -2049,6 +2049,7 @@ name = "mm-engine"
 version = "0.0.1"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2057,6 +2058,7 @@ version = "0.0.1"
 dependencies = [
  "mm-data",
  "mm-engine",
+ "serde_json",
 ]
 
 [[package]]

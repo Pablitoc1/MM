@@ -33,6 +33,11 @@ Vue 2D du match sur un faux match scripté : écran « Match en direct », forma
 Écran complet autour de la carte (tableau de score, cartes des 10 joueurs, courbe d'or, fil du match),
 monté sur les composants d'interface préparés à part.
 
+## M3 · où on en est
+Moteur seconde par seconde : carte en réseau de points, vagues, tours, camps, farm, vision et balises,
+flux de la vue 2D (note 009). `just sim KC G2 --n 100` compare les CS, l'or et l'XP à la LEC 2025
+(rapport dans `docs/demo/M3/`).
+
 ## Ce qui manque
 M3 en cours (voir plus haut), puis M4 · Combat et M5 · IA d'équipe.
 Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
