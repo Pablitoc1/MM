@@ -6,7 +6,7 @@ import {
 import { ALCOVES, CAMPS, STRUCTURES, toUnit, type CampKind, type Point } from './map';
 import type { MatchReplay, TeamIndex } from './replay';
 import { championIcon, localAsset } from './icons';
-import { GRUBS, formatClock, type CampView, type MatchState } from './state';
+import { GRUBS, HERALD, formatClock, type CampView, type MatchState } from './state';
 
 /** Couleurs lues dans tokens.css au démarrage (Pixi ne lit pas le CSS lui-même). */
 const TOKENS = {
@@ -334,7 +334,7 @@ export class MatchRenderer {
     badge.setHalo(big && alive ? color : null);
     let label = '';
     if (!alive && c.respawnIn !== null) label = formatClock(c.respawnIn);
-    if (big && alive) label = grubs ? 'Larves en jeu' : c.camp.kind === 'baron' ? 'Nashor en jeu' : `${c.variant ?? 'Dragon'} en jeu`;
+    if (big && alive) label = grubs ? 'Larves en jeu' : c.variant === HERALD ? 'Héraut en jeu' : c.camp.kind === 'baron' ? 'Nashor en jeu' : `${c.variant ?? 'Dragon'} en jeu`;
     if (big && !alive && c.respawnIn !== null) {
       label = `${c.camp.kind === 'baron' ? (c.variant === GRUBS ? 'Larves' : 'Nashor') : 'Dragon'} ${formatClock(c.respawnIn)}`;
     }

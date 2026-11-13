@@ -4,9 +4,11 @@
 
 mod combat;
 
+mod objectives;
 mod siege;
 
 use combat::{Fighter, Mode};
+pub use objectives::ObjectiveReport;
 pub use siege::TeamReport;
 
 use crate::geo::{Lane, Point, Side, BLUE, RED};
@@ -91,6 +93,8 @@ pub struct MatchResult {
     pub players: Vec<PlayerReport>,
     /// Bâtiments pris par chaque équipe.
     pub teams: [TeamReport; 2],
+    /// Grands monstres pris par chaque équipe.
+    pub objectives: [ObjectiveReport; 2],
     pub winner: Side,
     /// La partie s'est finie sur un Nexus (sinon : limite de durée atteinte).
     pub ended: bool,
@@ -110,6 +114,8 @@ const JUNGLE_CLEAR: f64 = 3.6;
 const RECALL_GOLD: f64 = 1300.0; // estimé (prix d'un premier objet)
 /// Un champion à moins de cette distance d'une vague qui menace sa base vient la nettoyer.
 const BASE_DEFENSE_RANGE: f64 = 6000.0; // estimé
+/// Le jungler revoit son plan toutes les quelques secondes (fiche M5 : 5 à 10 s).
+const PLAN_EVERY: f64 = 8.0; // estimé
 /// Dominé près de sa tour : il recule de cette distance derrière elle et la laisse tomber.
 const CONCEDE_BACK: f64 = 1300.0; // estimé
 /// Distance au-delà de laquelle le vis-à-vis ne gêne plus : on pousse la vague.
@@ -128,6 +134,19 @@ struct Ward {
     side: Side,
     pos: Point,
     expires: f64,
+}
+
+/// Plan d'un champion hors de sa routine (M5b ; le plan d'équipe complet arrive en M5c).
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Plan {
+    None,
+    /// Aller sur le grand monstre du camp (index).
+    Objective(usize),
+    /// Le jungler va ganker ce champion, jusqu'à cet instant au plus tard.
+    Gank {
+        target: usize,
+        until: f64,
+    },
 }
 
 struct Champ {
@@ -150,6 +169,10 @@ struct Champ {
     recall_until: Option<f64>,
     trinket_at: f64,
     camp: Option<usize>,
+    /// Ce que le champion fait hors de sa voie ou de ses camps (M5b).
+    plan: Plan,
+    /// Dernier choix de plan du jungler.
+    plan_at: f64,
     report: PlayerReport,
     fighter: Fighter,
 }
@@ -247,6 +270,7 @@ struct Game {
     /// Dernier champion à avoir frappé chaque bâtiment, et quand.
     last_structure_hit: Vec<Option<(usize, f64)>>,
     teams: [TeamReport; 2],
+    obj: objectives::Objectives,
 }
 
 /// Simule une partie. La même configuration (graine comprise) donne exactement la même partie.
@@ -256,6 +280,7 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
     let dt = rules::TICK;
     while g.t <= setup.duration + 1e-9 {
         g.spawn_camps();
+        g.minion_buffs();
         let (deaths, destroyed) = g.lanes.step(g.t, dt);
         for b in destroyed {
             g.structure_destroyed(b);
@@ -264,13 +289,15 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
         g.farm(&deaths, None);
         g.respawn();
         g.decide();
-        for i in 0..g.champs.len() {
+        // Ordre tiré à chaque seconde : réfléchir avant l'autre équipe ne doit pas l'avantager.
+        for i in g.shuffled() {
             let c = &g.champs[i];
             if c.alive() && c.fighter.mode == Mode::Idle {
                 g.think(i, dt);
             }
         }
         g.combat(dt);
+        g.objectives(dt);
         g.plates();
         g.vision(dt);
         for c in &mut g.champs {
@@ -304,6 +331,7 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
     }
     let end = frames.last().map_or(0.0, |f| f.t);
     let ended = g.winner.is_some();
+    let objectives = g.objective_report();
     let winner = g.winner.unwrap_or_else(|| {
         if g.team_gold(BLUE) >= g.team_gold(RED) {
             BLUE
@@ -339,6 +367,7 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
         },
         players,
         teams: g.teams,
+        objectives,
         winner,
         ended,
     }
@@ -377,6 +406,8 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
                 trinket_at: 0.0,
                 camp: None,
                 report: PlayerReport::default(),
+                plan: Plan::None,
+                plan_at: 0.0,
                 fighter: Fighter {
                     has_flash: p.spells.iter().any(|s| s == "SummonerFlash"),
                     ..Fighter::new(p.kit.clone())
@@ -425,6 +456,7 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
         plates_taken: Vec::new(),
         last_structure_hit: Vec::new(),
         teams: [TeamReport::default(); 2],
+        obj: objectives::Objectives::default(),
     };
     g.plates_taken = vec![0; g.lanes.buildings.len()];
     g.last_structure_hit = vec![None; g.lanes.buildings.len()];
@@ -432,6 +464,16 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
 }
 
 impl Game {
+    /// Les champions dans un ordre tiré au sort (avec le générateur de la partie).
+    fn shuffled(&mut self) -> Vec<usize> {
+        let mut order: Vec<usize> = (0..self.champs.len()).collect();
+        for a in (1..order.len()).rev() {
+            let b = (self.rng.next_u64() % (a as u64 + 1)) as usize;
+            order.swap(a, b);
+        }
+        order
+    }
+
     fn team_gold(&self, side: Side) -> f64 {
         self.champs
             .iter()
@@ -441,34 +483,22 @@ impl Game {
     }
 
     fn spawn_camps(&mut self) {
-        const DRAGONS: [&str; 6] = [
-            "Infernal", "Océan", "Montagne", "Nuage", "Chimtech", "Hextech",
-        ];
         for i in 0..self.camps.len() {
             let c = &self.camps[i];
-            if c.alive || self.t < c.next_spawn {
+            if c.alive || self.t < c.next_spawn || !c.def.kind.farmable() {
                 continue;
             }
-            let variant = match c.def.kind {
-                CampKind::Dragon => Some(DRAGONS[(self.rng.next_u64() % 6) as usize].to_string()),
-                CampKind::Baron if self.t < 1200.0 => Some("Larves du Néant".to_string()),
-                CampKind::Baron => Some("Nashor".to_string()),
-                _ => None,
-            };
             let c = &mut self.camps[i];
             c.alive = true;
             c.hp = c.def.kind.hp();
-            // Les larves restent jusqu'à l'arrivée du Nashor (personne ne les prend en M3).
-            if c.def.kind == CampKind::Baron && self.t < 1200.0 {
-                c.next_spawn = 1200.0;
-                c.alive = false;
-            }
             self.events.push(Event::CampSpawn {
                 t: self.t,
                 camp: c.def.id.to_string(),
-                variant,
+                variant: None,
             });
         }
+        // Dragons et fosse du haut : leur propre calendrier (note 016).
+        self.spawn_objectives();
     }
 
     /// Les sbires qui meurent donnent de l'XP aux champions proches, et de l'or au champion
@@ -566,6 +596,12 @@ impl Game {
                 return;
             }
         }
+        // Son jungler va sur un objectif proche de sa voie : il le rejoint.
+        if let Some(k) = self.joins_objective(i) {
+            let spot = self.objective_spot(k, self.champs[i].side);
+            self.champs[i].walk(&self.nav, spot, dt);
+            return;
+        }
         if self.champs[i].role == Role::Jungle {
             self.jungle(i, dt);
         } else {
@@ -581,6 +617,29 @@ impl Game {
             let pos = c.pos.toward(Point::new(7410.0, 7460.0), 900.0);
             self.place_ward(i, pos);
         }
+    }
+
+    /// L'objectif que le joueur de voie `i` rejoint, si son jungler y va.
+    fn joins_objective(&self, i: usize) -> Option<usize> {
+        let c = &self.champs[i];
+        if c.role == Role::Jungle {
+            return None;
+        }
+        // Les joueurs de voie ne quittent leur vague qu'au dernier moment : quand le monstre
+        // est là (ou presque) et que leur jungler est déjà sur place.
+        self.champs.iter().find_map(|o| match o.plan {
+            Plan::Objective(k)
+                if o.side == c.side
+                    && self.objective_roles(k).contains(&c.role)
+                    && c.pos.dist(self.camps[k].def.pos) < objectives::ROTATE_RANGE
+                    && (self.camps[k].alive
+                        || self.camps[k].next_spawn - self.t <= objectives::JOIN_BEFORE)
+                    && o.pos.dist(self.camps[k].def.pos) <= objectives::JUNGLER_THERE =>
+            {
+                Some(k)
+            }
+            _ => None,
+        })
     }
 
     fn place_ward(&mut self, i: usize, pos: Point) {
@@ -714,9 +773,68 @@ impl Game {
         self.champs[i].walk(&self.nav, goal, dt);
     }
 
+    /// Le jungler choisit de temps en temps entre farmer, un objectif et un gank (M5b).
+    fn jungle_plan(&mut self, i: usize) {
+        let t = self.t;
+        let c = &self.champs[i];
+        // Le plan en cours tient-il toujours ?
+        let keep = match c.plan {
+            Plan::None => true,
+            // On lâche l'objectif quand l'adversaire y a nettement plus de monde (Nashor et
+            // ancestral : dès qu'on n'a plus l'avantage numérique).
+            Plan::Objective(k) => {
+                let camp = &self.camps[k];
+                let (ours, theirs) = (self.available(c.side, k), self.available(1 - c.side, k));
+                (camp.alive || camp.next_spawn - t <= 40.0)
+                    && if self.risky(k) {
+                        ours > theirs
+                    } else {
+                        ours + 1 >= theirs
+                    }
+            }
+            Plan::Gank { target, until } => {
+                let o = &self.champs[target];
+                t < until
+                    && o.alive()
+                    && o.recall_until.is_none()
+                    && !self.under_enemy_turret(c.side, o.pos)
+            }
+        };
+        if !keep {
+            self.champs[i].plan = Plan::None;
+        }
+        if self.champs[i].plan != Plan::None || t - self.champs[i].plan_at < PLAN_EVERY || t < 150.0
+        {
+            return;
+        }
+        self.champs[i].plan_at = t;
+        if let Some(k) = self.pick_objective(i) {
+            self.champs[i].plan = Plan::Objective(k);
+        } else if let Some(j) = self.pick_gank(i) {
+            self.champs[i].plan = Plan::Gank {
+                target: j,
+                until: t + objectives::GANK_TIMEOUT,
+            };
+        }
+    }
+
     fn jungle(&mut self, i: usize, dt: f64) {
         let t = self.t;
         let side = self.champs[i].side;
+        self.jungle_plan(i);
+        match self.champs[i].plan {
+            Plan::Objective(k) => {
+                let spot = self.objective_spot(k, self.champs[i].side);
+                self.champs[i].walk(&self.nav, spot, dt);
+                return;
+            }
+            Plan::Gank { target, .. } => {
+                let to = self.champs[target].pos;
+                self.champs[i].walk(&self.nav, to, dt);
+                return;
+            }
+            Plan::None => {}
+        }
         // Le camp visé a été pris par un autre (carapateur) : on en choisit un autre.
         if let Some(k) = self.champs[i].camp {
             if !self.camps[k].alive && self.camps[k].next_spawn > t + 20.0 && t > 100.0 {

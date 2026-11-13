@@ -80,6 +80,8 @@ pub struct Lanes {
     pub buildings: Vec<Building>,
     /// Inhibiteurs revenus pendant le dernier pas (index).
     pub respawned: Vec<usize>,
+    /// Sbires renforcés (Nashor) de chaque équipe : dégâts aux vagues, dégâts aux bâtiments.
+    pub buffs: [(f64, f64); 2],
     next_id: u32,
     wave_number: u32,
 }
@@ -109,6 +111,7 @@ impl Lanes {
             waves: Vec::new(),
             buildings,
             respawned: Vec::new(),
+            buffs: [(1.0, 1.0); 2],
             next_id: 1,
             wave_number: 0,
         }
@@ -152,19 +155,49 @@ impl Lanes {
                     .map(|(i, _)| i)
             };
             // 1. Marche : chaque vague avance jusqu'au contact d'une vague ou d'un bâtiment adverse.
+            // Les deux fronts avancent en même temps : s'ils se rejoignent pendant le pas, ils se
+            // retrouvent au milieu de l'écart (pas de préférence pour l'équipe calculée en premier).
+            let fronts = [front(&self.waves, 0), front(&self.waves, 1)];
+            let gap = match fronts {
+                [Some(b), Some(r)] => {
+                    Some(len - self.waves[b].d - self.waves[r].d - rules::WAVE_CONTACT)
+                }
+                _ => None,
+            };
+            let reach = |lanes: &Lanes, i: usize| {
+                let w = &lanes.waves[i];
+                let mut stop = w.d + rules::MINION_SPEED * dt;
+                if let Some(b) = lanes.next_target(w.side, lane, w.d) {
+                    stop = stop.min(lanes.buildings[b].along[lane.index()] - 450.0);
+                }
+                (stop - w.d).max(0.0)
+            };
+            let mut front_step = fronts.map(|f| f.map_or(0.0, |i| reach(self, i)));
+            if let Some(gap) = gap {
+                let gap = gap.max(0.0);
+                if front_step[0] + front_step[1] > gap {
+                    // Chacun prend la moitié de l'écart, et ce que l'autre ne prend pas.
+                    let half = gap / 2.0;
+                    let (a, b) = (front_step[0], front_step[1]);
+                    front_step[0] = a.min(half.max(gap - b));
+                    front_step[1] = b.min(half.max(gap - a));
+                }
+            }
             for side in [0, 1] {
-                let enemy = front(&self.waves, 1 - side).map(|i| len - self.waves[i].d);
                 for i in 0..self.waves.len() {
                     let w = &self.waves[i];
                     if w.side != side || w.lane != lane {
                         continue;
                     }
-                    let mut stop = enemy.map_or(f64::MAX, |e| e - rules::WAVE_CONTACT);
-                    if let Some(b) = self.next_target(side, lane, w.d) {
-                        stop = stop.min(self.buildings[b].along[lane.index()] - 450.0);
-                    }
-                    let d = (w.d + rules::MINION_SPEED * dt).min(stop.max(w.d));
-                    self.waves[i].d = d;
+                    let step = if Some(i) == fronts[side] {
+                        front_step[side]
+                    } else {
+                        // Les vagues de derrière ne dépassent pas leur front.
+                        let limit =
+                            fronts[side].map_or(f64::MAX, |f| self.waves[f].d + front_step[side]);
+                        reach(self, i).min((limit - w.d).max(0.0))
+                    };
+                    self.waves[i].d += step;
                 }
             }
             // 2. Les vagues d'une même équipe qui se rejoignent n'en font plus qu'une.
@@ -179,20 +212,21 @@ impl Lanes {
             };
             // Les deux vagues frappent en même temps : dégâts calculés avant d'être appliqués.
             let dps = [fb, fr].map(|o| o.map_or(0.0, |i| self.waves[i].dps()));
+            let buffs = self.buffs;
             for (me, other) in [(fb, fr), (fr, fb)] {
                 let Some(me) = me else { continue };
                 let side = self.waves[me].side;
                 let target = self.next_target(side, lane, self.waves[me].d);
                 if contact {
                     if let Some(o) = other {
-                        let dmg = dps[side] * dt;
+                        let dmg = dps[side] * buffs[side].0 * dt;
                         self.hit_wave(o, dmg, &mut deaths);
                     }
                 } else if let Some(b) = target {
                     let in_range =
                         self.buildings[b].along[lane.index()] - self.waves[me].d <= 600.0;
                     if in_range {
-                        let dmg = dps[side] * rules::MINION_VS_STRUCTURE * dt;
+                        let dmg = dps[side] * rules::MINION_VS_STRUCTURE * buffs[side].1 * dt;
                         let bld = &mut self.buildings[b];
                         // La tour extérieure tient jusqu'à 14:00 grâce aux plaques (simplifié).
                         bld.hp -= dmg;
@@ -364,6 +398,31 @@ mod tests {
             dead += l.step(f64::from(s), 1.0).0.len();
         }
         (l, dead)
+    }
+
+    #[test]
+    fn les_premieres_vagues_se_rencontrent_au_milieu() {
+        let mut l = Lanes::new();
+        for s in 0..120 {
+            l.step(f64::from(s), 1.0);
+            let fronts: Vec<f64> = [0, 1]
+                .iter()
+                .filter_map(|&side| {
+                    l.waves
+                        .iter()
+                        .filter(|w| w.side == side && w.lane == Lane::Mid)
+                        .map(|w| w.d)
+                        .reduce(f64::max)
+                })
+                .collect();
+            if let [b, r] = fronts[..] {
+                if Lane::Mid.length() - b - r <= rules::WAVE_CONTACT + 1.0 {
+                    assert!((b - r).abs() < 1.0, "rencontre : bleu {b}, rouge {r}");
+                    return;
+                }
+            }
+        }
+        panic!("les vagues ne se rencontrent pas");
     }
 
     #[test]

@@ -67,7 +67,9 @@ impl Game {
             * c.crit_factor()
             * c.attack_speed()
             * dt
-            * mitigate(1.0, rules::STRUCTURE_ARMOR);
+            * mitigate(1.0, rules::STRUCTURE_ARMOR)
+            * self.power(c.side)
+            * self.structure_power(c.side);
         self.champs[i].report.structure_damage += dmg;
         self.last_structure_hit[b] = Some((i, self.t));
         let bld = &mut self.lanes.buildings[b];
@@ -81,7 +83,8 @@ impl Game {
     /// Dégâts par seconde du champion `i` sur une vague quand il la pousse : attaques, plus ses
     /// sorts de dégâts à chaque recharge, multipliés par les sbires qu'ils touchent.
     /// Renvoie aussi le mana dépensé par seconde.
-    pub(super) fn clear_dps(&self, i: usize) -> (f64, f64) {
+    /// `monster` : un seul grand monstre (les sorts ne touchent qu'une cible).
+    pub(super) fn clear_dps(&self, i: usize, monster: bool) -> (f64, f64) {
         let c = &self.champs[i];
         let mut dps = c.ad() * c.crit_factor() * c.attack_speed();
         let mut mana = 0.0;
@@ -98,6 +101,7 @@ impl Game {
                 };
                 let cd = (spell.cooldown_at(rank) * c.haste_factor()).max(1.0);
                 let targets = match spell.targeting {
+                    _ if monster => 1.0,
                     Targeting::Area | Targeting::SelfCast => AREA_TARGETS,
                     Targeting::Skillshot => SKILLSHOT_TARGETS,
                     Targeting::Unit => 1.0,
@@ -125,7 +129,7 @@ impl Game {
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(k, _)| k);
         let Some(k) = target else { return false };
-        let (dps, mana) = self.clear_dps(i);
+        let (dps, mana) = self.clear_dps(i, false);
         let c = &mut self.champs[i];
         c.fighter.mana = (c.fighter.mana - mana * dt).max(0.0);
         let mut deaths = Vec::new();

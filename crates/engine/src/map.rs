@@ -52,17 +52,17 @@ pub fn structures() -> Vec<Structure> {
         ("blue_bot_inhib", BLUE, Turret, Some(Bot), 4281.0, 1253.0),
         ("blue_nexus_top", BLUE, Turret, None, 1748.0, 2270.0),
         ("blue_nexus_bot", BLUE, Turret, None, 2177.0, 1807.0),
-        ("red_top_outer", RED, Turret, Some(Top), 4318.0, 13875.0),
-        ("red_top_inner", RED, Turret, Some(Top), 7943.0, 13411.0),
-        ("red_top_inhib", RED, Turret, Some(Top), 10481.0, 13650.0),
-        ("red_mid_outer", RED, Turret, Some(Mid), 8955.0, 8510.0),
-        ("red_mid_inner", RED, Turret, Some(Mid), 9767.0, 10113.0),
-        ("red_mid_inhib", RED, Turret, Some(Mid), 11134.0, 11207.0),
-        ("red_bot_outer", RED, Turret, Some(Bot), 13866.0, 4505.0),
-        ("red_bot_inner", RED, Turret, Some(Bot), 13327.0, 8226.0),
-        ("red_bot_inhib", RED, Turret, Some(Bot), 13624.0, 10572.0),
-        ("red_nexus_top", RED, Turret, None, 12611.0, 13084.0),
-        ("red_nexus_bot", RED, Turret, None, 13052.0, 12612.0),
+        ("red_top_outer", RED, Turret, Some(Top), 4316.0, 13891.0),
+        ("red_top_inner", RED, Turret, Some(Top), 7901.0, 13437.0),
+        ("red_top_inhib", RED, Turret, Some(Top), 10539.0, 13667.0),
+        ("red_mid_outer", RED, Turret, Some(Mid), 8974.0, 8524.0),
+        ("red_mid_inner", RED, Turret, Some(Mid), 9772.0, 10108.0),
+        ("red_mid_inhib", RED, Turret, Some(Mid), 11169.0, 11224.0),
+        ("red_bot_outer", RED, Turret, Some(Bot), 13839.0, 4479.0),
+        ("red_bot_inner", RED, Turret, Some(Bot), 13308.0, 8221.0),
+        ("red_bot_inhib", RED, Turret, Some(Bot), 13651.0, 10633.0),
+        ("red_nexus_top", RED, Turret, None, 12643.0, 13113.0),
+        ("red_nexus_bot", RED, Turret, None, 13072.0, 12650.0),
         (
             "blue_inhibitor_top",
             BLUE,
@@ -92,27 +92,27 @@ pub fn structures() -> Vec<Structure> {
             RED,
             Inhibitor,
             Some(Top),
-            11261.0,
-            13676.0,
+            11368.0,
+            13684.0,
         ),
         (
             "red_inhibitor_mid",
             RED,
             Inhibitor,
             Some(Mid),
-            11598.0,
-            11667.0,
+            11617.0,
+            11712.0,
         ),
         (
             "red_inhibitor_bot",
             RED,
             Inhibitor,
             Some(Bot),
-            13604.0,
-            11316.0,
+            13649.0,
+            11349.0,
         ),
         ("blue_nexus", BLUE, Nexus, None, 1551.0, 1661.0), // estimé (minimap)
-        ("red_nexus", RED, Nexus, None, 13265.0, 13207.0), // estimé (minimap)
+        ("red_nexus", RED, Nexus, None, 13269.0, 13259.0), // estimé (minimap)
     ];
     raw.into_iter()
         .map(|(id, side, kind, lane, x, y)| Structure {
@@ -213,16 +213,16 @@ pub fn camps() -> Vec<Camp> {
         ("blue_raptors", Raptors, Some(BLUE), 6943.0, 5422.0),
         ("blue_red", Red, Some(BLUE), 7765.0, 4020.0),
         ("blue_krugs", Krugs, Some(BLUE), 8482.0, 2705.0),
-        ("red_blue", Blue, Some(RED), 10984.0, 6960.0),
-        ("red_gromp", Gromp, Some(RED), 12671.0, 6306.0),
-        ("red_wolves", Wolves, Some(RED), 11008.0, 8387.0),
-        ("red_raptors", Raptors, Some(RED), 7852.0, 9419.0),
-        ("red_red", Red, Some(RED), 7101.0, 10900.0),
-        ("red_krugs", Krugs, Some(RED), 6317.0, 12146.0),
+        ("red_blue", Blue, Some(RED), 10999.0, 6819.0),
+        ("red_gromp", Gromp, Some(RED), 12532.0, 6472.0),
+        ("red_wolves", Wolves, Some(RED), 11040.0, 8477.0),
+        ("red_raptors", Raptors, Some(RED), 7877.0, 9498.0),
+        ("red_red", Red, Some(RED), 7055.0, 10900.0),
+        ("red_krugs", Krugs, Some(RED), 6338.0, 12215.0),
         ("scuttle_top", Scuttle, None, 4400.0, 9600.0),
-        ("scuttle_bot", Scuttle, None, 10500.0, 5170.0),
+        ("scuttle_bot", Scuttle, None, 10420.0, 5320.0),
         ("dragon", Dragon, None, 9866.0, 4414.0),
-        ("baron", Baron, None, 5007.0, 10471.0),
+        ("baron", Baron, None, 4954.0, 10506.0),
     ];
     raw.into_iter()
         .map(|(id, kind, side, x, y)| Camp {
@@ -290,7 +290,7 @@ const HALF: [(f64, f64); 16] = [
     (9900.0, 2600.0),  // 15 entrée de la rivière du bas, côté krugs
 ];
 
-const LINKS: [(End, End); 31] = {
+const LINKS: [(End, End); 32] = {
     use End::*;
     [
         (Own(1), Own(8)),
@@ -324,6 +324,9 @@ const LINKS: [(End, End); 31] = {
         (Own(4), Own(5)),
         (Own(5), Own(15)),
         (Own(15), Near(Lane::Bot)),
+        // Depuis le côté bleu de la voie du bas, on remonte la rivière jusqu'au dragon
+        // (et, par reflet, depuis le côté rouge de la voie du haut jusqu'au Nashor).
+        (Own(15), Other(7)),
     ]
 };
 
@@ -376,7 +379,10 @@ impl Nav {
                     End::Own(i) => half[side][i],
                     End::Other(i) => half[1 - side][i],
                     End::Center => center,
-                    End::Near(l) => nav.nearest_on_lane(l, from),
+                    // Le reflet de la voie du haut est celle du bas (et l'inverse).
+                    End::Near(l) => {
+                        nav.nearest_on_lane(if side == BLUE { l } else { l.mirror() }, from)
+                    }
                 };
                 let a = resolve(&nav, a, Point::new(0.0, 0.0));
                 let b = resolve(&nav, b, nav.nodes[a]);
@@ -481,6 +487,43 @@ const MIRROR_CENTER: (f64, f64) = (7410.0, 7460.0);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn la_carte_est_symetrique() {
+        // Chaque bâtiment et chaque camp rouge est le reflet de son équivalent bleu.
+        let partner = |id: &str| -> String {
+            let id = id.replacen("red_", "blue_", 1);
+            id.replace("_top", "_TMP")
+                .replace("_bot", "_top")
+                .replace("_TMP", "_bot")
+        };
+        let s = structures();
+        for r in s.iter().filter(|b| b.side == RED) {
+            let b = if r.id == "red_nexus" {
+                "blue_nexus".to_string()
+            } else {
+                partner(r.id)
+            };
+            let b = s.iter().find(|x| x.id == b).unwrap();
+            assert!(b.pos.mirror().dist(r.pos) < 1.0, "{} {:?}", r.id, r.pos);
+        }
+        let c = camps();
+        let pos = |id: &str| c.iter().find(|k| k.id == id).unwrap().pos;
+        for k in c.iter().filter(|k| k.side == Some(RED)) {
+            let b = k.id.replacen("red_", "blue_", 1);
+            assert!(pos(&b).mirror().dist(k.pos) < 1.0, "{}", k.id);
+        }
+        assert!(pos("dragon").mirror().dist(pos("baron")) < 1.0);
+        assert!(pos("scuttle_top").mirror().dist(pos("scuttle_bot")) < 1.0);
+        // Et les trajets aussi : de chaque fontaine à la fosse de son côté de la carte.
+        let nav = Nav::build();
+        let a = nav.route_length(fountain(BLUE), pos("dragon"));
+        let b = nav.route_length(fountain(RED), pos("baron"));
+        assert!((a - b).abs() < 0.02 * a, "{a} contre {b}");
+        let a = nav.route_length(pos("blue_red"), pos("dragon"));
+        let b = nav.route_length(pos("red_red"), pos("baron"));
+        assert!((a - b).abs() < 0.02 * a, "{a} contre {b}");
+    }
 
     #[test]
     fn la_carte_est_complete() {

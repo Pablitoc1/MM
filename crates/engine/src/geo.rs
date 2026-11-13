@@ -65,6 +65,16 @@ impl Lane {
         self as usize
     }
 
+    /// La voie qui lui correspond de l'autre côté de la carte (symétrie par le centre) :
+    /// le haut devient le bas.
+    pub fn mirror(self) -> Lane {
+        match self {
+            Lane::Top => Lane::Bot,
+            Lane::Mid => Lane::Mid,
+            Lane::Bot => Lane::Top,
+        }
+    }
+
     /// Tracé de la voie, du nexus bleu au nexus rouge, virages compris.
     /// estimé : relevé sur la minimap Data Dragon 16.22 (même tracé que la vue 2D).
     pub fn points(self) -> &'static [Point] {
@@ -121,6 +131,9 @@ const fn p(x: f64, y: f64) -> Point {
     Point::new(x, y)
 }
 
+// La moitié rouge de la carte est le reflet exact de la moitié bleue (symétrie par le centre) :
+// le moteur ne favorise aucun côté par sa géométrie. Le relevé de la minimap ne s'en écarte que
+// de quelques dizaines d'unités. estimé
 const TOP: [Point; 8] = [
     p(1551.0, 1661.0),
     p(1150.0, 3000.0),
@@ -129,23 +142,23 @@ const TOP: [Point; 8] = [
     p(2400.0, 13550.0),
     p(4300.0, 13850.0),
     p(10500.0, 13750.0),
-    p(13265.0, 13207.0),
+    p(13269.0, 13259.0),
 ];
 const MID: [Point; 4] = [
     p(1551.0, 1661.0),
     p(3203.0, 3208.0),
-    p(11598.0, 11667.0),
-    p(13265.0, 13207.0),
+    p(11617.0, 11712.0),
+    p(13269.0, 13259.0),
 ];
 const BOT: [Point; 8] = [
     p(1551.0, 1661.0),
-    p(3000.0, 1150.0),
-    p(10500.0, 1050.0),
-    p(12500.0, 1350.0),
-    p(13550.0, 2400.0),
-    p(13850.0, 4300.0),
-    p(13750.0, 10500.0),
-    p(13265.0, 13207.0),
+    p(4320.0, 1170.0),
+    p(10520.0, 1070.0),
+    p(12420.0, 1370.0),
+    p(13470.0, 2420.0),
+    p(13720.0, 4420.0),
+    p(13670.0, 11920.0),
+    p(13269.0, 13259.0),
 ];
 
 #[cfg(test)]

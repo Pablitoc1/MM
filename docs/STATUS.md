@@ -67,8 +67,14 @@ sur le Nexus (note 015, rapport `docs/demo/M5/rapport-batiments.md`). Tours (11,
 plaques (5,9 contre 8,0) et kills (0,73 par minute contre 0,81) sont proches de la LEC ; la durée ne
 l'est pas encore (17 % des parties finies avant 60 min) : il manque le plan d'équipe (M5c).
 
+M5b : dragons (et âme, ancestral), larves, Héraut, Nashor, et ganks du jungler (note 016, rapport
+`docs/demo/M5/rapport-objectifs.md`). La carte du moteur est maintenant exactement symétrique et trois
+biais de côté sont corrigés : en miroir, le bleu gagne 54 % (56 % en LEC). Dragons, larves et Hérauts
+sont proches de la LEC ; Nashors et ancestraux sont trop nombreux parce que les parties durent encore
+46 min (33,6 en LEC) : 85 % finissent avant 60 min.
+
 ## Ce qui manque
-M5b (dragons, larves, Nashor, ganks), M5c (plan d'équipe, combats d'équipe, calibrage final).
+M5c (plan d'équipe, combats d'équipe, durée des parties, calibrage final).
 Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
 postes (Rekkles noté sur ses seules parties de support) ; les notes n'évoluent pas encore (M10).
 

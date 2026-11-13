@@ -49,25 +49,25 @@ export const STRUCTURES: Structure[] = [
   s('blue_bot_inhib', 0, 'turret', 'bot', 4281, 1253),
   s('blue_nexus_top', 0, 'turret', null, 1748, 2270),
   s('blue_nexus_bot', 0, 'turret', null, 2177, 1807),
-  s('red_top_outer', 1, 'turret', 'top', 4318, 13875),
-  s('red_top_inner', 1, 'turret', 'top', 7943, 13411),
-  s('red_top_inhib', 1, 'turret', 'top', 10481, 13650),
-  s('red_mid_outer', 1, 'turret', 'mid', 8955, 8510),
-  s('red_mid_inner', 1, 'turret', 'mid', 9767, 10113),
-  s('red_mid_inhib', 1, 'turret', 'mid', 11134, 11207),
-  s('red_bot_outer', 1, 'turret', 'bot', 13866, 4505),
-  s('red_bot_inner', 1, 'turret', 'bot', 13327, 8226),
-  s('red_bot_inhib', 1, 'turret', 'bot', 13624, 10572),
-  s('red_nexus_top', 1, 'turret', null, 12611, 13084),
-  s('red_nexus_bot', 1, 'turret', null, 13052, 12612),
+  s('red_top_outer', 1, 'turret', 'top', 4316, 13891),
+  s('red_top_inner', 1, 'turret', 'top', 7901, 13437),
+  s('red_top_inhib', 1, 'turret', 'top', 10539, 13667),
+  s('red_mid_outer', 1, 'turret', 'mid', 8974, 8524),
+  s('red_mid_inner', 1, 'turret', 'mid', 9772, 10108),
+  s('red_mid_inhib', 1, 'turret', 'mid', 11169, 11224),
+  s('red_bot_outer', 1, 'turret', 'bot', 13839, 4479),
+  s('red_bot_inner', 1, 'turret', 'bot', 13308, 8221),
+  s('red_bot_inhib', 1, 'turret', 'bot', 13651, 10633),
+  s('red_nexus_top', 1, 'turret', null, 12643, 13113),
+  s('red_nexus_bot', 1, 'turret', null, 13072, 12650),
   s('blue_inhibitor_top', 0, 'inhibitor', 'top', 1171, 3571),
   s('blue_inhibitor_mid', 0, 'inhibitor', 'mid', 3203, 3208),
   s('blue_inhibitor_bot', 0, 'inhibitor', 'bot', 3452, 1236),
-  s('red_inhibitor_top', 1, 'inhibitor', 'top', 11261, 13676),
-  s('red_inhibitor_mid', 1, 'inhibitor', 'mid', 11598, 11667),
-  s('red_inhibitor_bot', 1, 'inhibitor', 'bot', 13604, 11316),
+  s('red_inhibitor_top', 1, 'inhibitor', 'top', 11368, 13684),
+  s('red_inhibitor_mid', 1, 'inhibitor', 'mid', 11617, 11712),
+  s('red_inhibitor_bot', 1, 'inhibitor', 'bot', 13649, 11349),
   s('blue_nexus', 0, 'nexus', null, 1551, 1661), // estimé (minimap)
-  s('red_nexus', 1, 'nexus', null, 13265, 13207), // estimé (minimap)
+  s('red_nexus', 1, 'nexus', null, 13269, 13259), // estimé (minimap)
 ];
 
 export type CampKind =
@@ -90,16 +90,16 @@ export const CAMPS: Camp[] = [
   { id: 'blue_raptors', kind: 'raptors', side: 0, x: 6943, y: 5422 },
   { id: 'blue_red', kind: 'red', side: 0, x: 7765, y: 4020 },
   { id: 'blue_krugs', kind: 'krugs', side: 0, x: 8482, y: 2705 },
-  { id: 'red_blue', kind: 'blue', side: 1, x: 10984, y: 6960 },
-  { id: 'red_gromp', kind: 'gromp', side: 1, x: 12671, y: 6306 },
-  { id: 'red_wolves', kind: 'wolves', side: 1, x: 11008, y: 8387 },
-  { id: 'red_raptors', kind: 'raptors', side: 1, x: 7852, y: 9419 },
-  { id: 'red_red', kind: 'red', side: 1, x: 7101, y: 10900 },
-  { id: 'red_krugs', kind: 'krugs', side: 1, x: 6317, y: 12146 },
+  { id: 'red_blue', kind: 'blue', side: 1, x: 10999, y: 6819 },
+  { id: 'red_gromp', kind: 'gromp', side: 1, x: 12532, y: 6472 },
+  { id: 'red_wolves', kind: 'wolves', side: 1, x: 11040, y: 8477 },
+  { id: 'red_raptors', kind: 'raptors', side: 1, x: 7877, y: 9498 },
+  { id: 'red_red', kind: 'red', side: 1, x: 7055, y: 10900 },
+  { id: 'red_krugs', kind: 'krugs', side: 1, x: 6338, y: 12215 },
   { id: 'scuttle_top', kind: 'scuttle', side: null, x: 4400, y: 9600 },
-  { id: 'scuttle_bot', kind: 'scuttle', side: null, x: 10500, y: 5170 },
+  { id: 'scuttle_bot', kind: 'scuttle', side: null, x: 10420, y: 5320 },
   { id: 'dragon', kind: 'dragon', side: null, x: 9866, y: 4414 },
-  { id: 'baron', kind: 'baron', side: null, x: 5007, y: 10471 },
+  { id: 'baron', kind: 'baron', side: null, x: 4954, y: 10506 },
 ];
 
 /** Alcôves des virages top et bot (petites boucles au bord de la carte). */
@@ -115,14 +115,14 @@ export const ALCOVES: Point[] = [
 export const LANES: Record<Lane, Point[]> = {
   top: [
     { x: 1551, y: 1661 }, { x: 1150, y: 3000 }, { x: 1100, y: 10500 }, { x: 1350, y: 12500 },
-    { x: 2400, y: 13550 }, { x: 4300, y: 13850 }, { x: 10500, y: 13750 }, { x: 13265, y: 13207 },
+    { x: 2400, y: 13550 }, { x: 4300, y: 13850 }, { x: 10500, y: 13750 }, { x: 13269, y: 13259 },
   ],
   mid: [
-    { x: 1551, y: 1661 }, { x: 3203, y: 3208 }, { x: 11598, y: 11667 }, { x: 13265, y: 13207 },
+    { x: 1551, y: 1661 }, { x: 3203, y: 3208 }, { x: 11617, y: 11712 }, { x: 13269, y: 13259 },
   ],
   bot: [
-    { x: 1551, y: 1661 }, { x: 3000, y: 1150 }, { x: 10500, y: 1050 }, { x: 12500, y: 1350 },
-    { x: 13550, y: 2400 }, { x: 13850, y: 4300 }, { x: 13750, y: 10500 }, { x: 13265, y: 13207 },
+    { x: 1551, y: 1661 }, { x: 4320, y: 1170 }, { x: 10520, y: 1070 }, { x: 12420, y: 1370 },
+    { x: 13470, y: 2420 }, { x: 13720, y: 4420 }, { x: 13670, y: 11920 }, { x: 13269, y: 13259 },
   ],
 };
 

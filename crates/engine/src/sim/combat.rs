@@ -245,7 +245,7 @@ impl Game {
     /// Chaque seconde : chaque champion vivant juge s'il se bat, échange, fuit ou continue à farmer.
     pub(super) fn decide(&mut self) {
         let t = self.t;
-        for i in 0..self.champs.len() {
+        for i in self.shuffled() {
             let me = &self.champs[i];
             if !me.alive() || me.recall_until.is_some() {
                 continue;
@@ -362,10 +362,10 @@ impl Game {
                 continue;
             }
             if c.side == me.side {
-                ours += c.threat(t);
+                ours += c.threat(t) * self.power(c.side);
                 our_hp += c.effective_hp();
             } else {
-                theirs += c.threat(t);
+                theirs += c.threat(t) * self.power(c.side);
                 their_hp += c.effective_hp();
             }
         }
@@ -375,7 +375,7 @@ impl Game {
         (ours / their_hp) / (theirs / our_hp.max(1.0)).max(1e-6)
     }
 
-    fn under_enemy_turret(&self, side: usize, p: Point) -> bool {
+    pub(super) fn under_enemy_turret(&self, side: usize, p: Point) -> bool {
         self.lanes.buildings.iter().any(|b| {
             b.def.side != side
                 && b.alive()
@@ -397,7 +397,8 @@ impl Game {
         let start = self.t;
         for k in 0..steps {
             let t = start + k as f64 * COMBAT_DT;
-            for i in 0..self.champs.len() {
+            // Ordre tiré à chaque pas : agir en premier ne doit pas avantager un côté (M5b).
+            for i in self.shuffled() {
                 if self.champs[i].alive() {
                     self.act(i, t);
                 }
@@ -616,6 +617,8 @@ impl Game {
     /// Dégâts de `i` sur `j`, après résistances (moins la pénétration) et bouclier. Renvoie les
     /// dégâts infligés.
     fn hit(&mut self, i: usize, j: usize, raw: f64, kind: DamageType, t: f64) -> f64 {
+        // Dragons, âme, ancestral et Nashor renforcent les dégâts de l'équipe (note 016).
+        let raw = raw * self.power(self.champs[i].side);
         let target = &self.champs[j];
         let pen = &self.champs[i].inv.stats;
         // Ordre du jeu : pénétration en % puis fixe ; elle ne fait pas passer sous zéro.

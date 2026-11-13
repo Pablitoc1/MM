@@ -3,9 +3,9 @@
 // sont regroupés dans un encadré titré, avec l'objectif pris pendant le combat.
 import { LANES, STRUCTURES, campById, laneLength, pointOnLane, type Point } from './map';
 import type { Lane, MatchReplay, TeamIndex } from './replay';
-import { GRUBS, MULTIKILL_WINDOW, type Effect } from './state';
+import { GRUBS, HERALD, MULTIKILL_WINDOW, type Effect } from './state';
 
-export type ObjectiveCamp = 'dragon' | 'baron' | 'grubs';
+export type ObjectiveCamp = 'dragon' | 'baron' | 'grubs' | 'herald';
 
 export interface FeedObjective {
   t: number; team: TeamIndex; by: number | null; camp: ObjectiveCamp; variant: string | null;
@@ -75,6 +75,7 @@ export function placeName(p: Point): string {
 
 function objectiveName(camp: ObjectiveCamp, variant: string | null): string {
   if (camp === 'grubs') return 'Larves du Néant';
+  if (camp === 'herald') return HERALD;
   if (camp === 'baron') return 'Nashor';
   return variant ? `Drake ${variant.toLowerCase()}` : 'Dragon';
 }
@@ -137,14 +138,15 @@ export function buildFeed(replay: MatchReplay, t: number, effects: Effect[]): Fe
 
     if (e.type === 'camp_killed' && (e.camp === 'dragon' || e.camp === 'baron')) {
       const v = variant.get(e.camp) ?? null;
-      const camp: ObjectiveCamp = e.camp === 'dragon' ? 'dragon' : v === GRUBS ? 'grubs' : 'baron';
+      const camp: ObjectiveCamp = e.camp === 'dragon' ? 'dragon' : v === GRUBS ? 'grubs' : v === HERALD ? 'herald' : 'baron';
       const obj: FeedObjective = { t: e.t, team: e.team, by: e.by ?? null, camp, variant: v, name: objectiveName(camp, v) };
       // Un objectif pris pendant un combat (ou juste après) va dans l'encadré du combat.
       const fight = fightOf(e.t, 20);
       const block = fight && blocks.get(fight);
       if (block) { block.objectives.push(obj); continue; }
       const who = obj.by !== null ? player(obj.by) : tag(e.team);
-      const what = camp === 'dragon' ? `le ${obj.name.toLowerCase()}` : camp === 'grubs' ? 'les larves du Néant' : 'le Nashor';
+      const what = camp === 'dragon' ? `le ${obj.name.toLowerCase()}` : camp === 'grubs' ? 'les larves du Néant'
+        : camp === 'herald' ? 'le Héraut de la faille' : 'le Nashor';
       out.push({ kind: 'objective', ...obj, text: `${who} prend ${what} pour ${tag(e.team)}` });
     }
 
