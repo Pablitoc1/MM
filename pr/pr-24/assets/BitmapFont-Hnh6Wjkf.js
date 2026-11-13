@@ -1,1 +1,0 @@
-export{t as BitmapFont}from"./renderer-BC29O7B0.js";
