@@ -7,6 +7,7 @@
 //! (note `docs/decisions/010-moteur-carte-et-farm.md`).
 
 pub mod geo;
+pub mod item;
 pub mod kit;
 pub mod map;
 pub mod player;

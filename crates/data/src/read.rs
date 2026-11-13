@@ -387,6 +387,31 @@ impl Db {
         ids
     }
 
+    /// Stats d'un objet (JSON `mm_engine::item::Item`), si la base les a.
+    pub fn item_stats(&self, id: u32) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row("SELECT data FROM item_stats WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
+    }
+
+    /// Identifiants des objets dont la base a les stats.
+    pub fn item_ids(&self) -> rusqlite::Result<Vec<u32>> {
+        let mut st = self.conn.prepare("SELECT id FROM item_stats ORDER BY id")?;
+        let ids = st.query_map([], |r| r.get(0))?.collect();
+        ids
+    }
+
+    /// Mots-clés Data Dragon d'un champion (« Mage », « Tank »…), en JSON.
+    pub fn champion_tags(&self, id: &str) -> rusqlite::Result<Option<String>> {
+        self.conn
+            .query_row("SELECT tags FROM champions WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
+    }
+
     /// Sorts d'un champion (JSON `mm_engine::kit::Kit`), si la base les a.
     pub fn champion_kit(&self, id: &str) -> rusqlite::Result<Option<String>> {
         self.conn

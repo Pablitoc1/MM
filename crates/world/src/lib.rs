@@ -1,5 +1,6 @@
 //! Le monde du jeu : calendrier, gestion des clubs, IA, sauvegardes.
 
+pub mod build;
 pub mod date;
 pub mod draft;
 pub mod lineup;

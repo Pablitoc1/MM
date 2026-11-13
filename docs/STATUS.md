@@ -53,7 +53,12 @@ M4a : les sorts des 172 champions du patch 26.1, lus dans les fichiers du jeu (C
 complété par Meraki), table `champion_kits`, `just seed-kits`, contrôle de chaque sort (note 011).
 M4b : combat au quart de seconde (sorts, contrôles, tours, morts, primes, réapparition) et
 champions de la draft joués par le moteur (note 012, rapport `docs/demo/M4/rapport-combat.md`).
-Ensuite : les objets et le rapport sur 1 000 parties complètes (M4c).
+M4c : les stats réelles des 274 objets de la Faille (patch 26.1), un build type par profil de
+champion (estimé), achats à la fontaine, stats des objets dans tous les calculs du combat (note 014,
+rapport sur 1 000 parties de 35 min `docs/demo/M4/rapport-objets.md`).
+Écart principal : les kills (0,7 à 15 min contre 6,3 en LEC) et l'or qui en dépend (−15 % à 25 min) ;
+ils viendront des ganks, des combats d'équipe et des objectifs de M5. Une partie ne peut pas encore
+se finir (les champions n'attaquent pas les bâtiments) : la durée attend M5.
 
 ## Ce qui manque
 M4 en cours (voir plus haut), puis M5 · IA d'équipe.

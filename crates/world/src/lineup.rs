@@ -1,5 +1,5 @@
 //! Prépare un match pour le moteur à partir de la base : les cinq titulaires de chaque club,
-//! leur champion et ses stats Data Dragon.
+//! leur champion et ses stats Data Dragon, ses sorts (note 011) et ses objets (note 014).
 //!
 //! Avec une draft (M7), chaque joueur prend le champion choisi (`lineup_from_picks`).
 //! Sans draft, chaque joueur prend son champion le plus joué en 2025 qui n'est pas déjà pris. Les attributs viennent des notes M2 (note 007) ; un attribut absent
@@ -8,6 +8,7 @@
 use mm_data::read::{Db, Team};
 use mm_engine::{Attributes, ChampionStats, PlayerSetup, Role, TeamSetup};
 
+use crate::build::build;
 use crate::draft::Pick;
 
 const ROLES: [(&str, Role); 5] = [
@@ -26,6 +27,7 @@ pub enum LineupError {
     Db(mm_data::rusqlite::Error),
     MissingRole(String, &'static str),
     BadChampion(String),
+    BadItem(u32),
 }
 
 impl std::fmt::Display for LineupError {
@@ -36,6 +38,7 @@ impl std::fmt::Display for LineupError {
                 write!(f, "{team} : aucun joueur au poste {role}")
             }
             LineupError::BadChampion(id) => write!(f, "stats illisibles pour le champion {id}"),
+            LineupError::BadItem(id) => write!(f, "stats illisibles pour l'objet {id}"),
         }
     }
 }
@@ -160,6 +163,7 @@ pub fn lineup(db: &Db, team: &Team, taken: &mut Vec<String>) -> Result<TeamSetup
         players.push(PlayerSetup {
             name: p.handle.clone(),
             role: *role,
+            build: build(db, &champion.id, *role, kit.as_ref())?,
             champion,
             attrs: attributes(db, &p.person_id)?,
             spells: spells(*role),
@@ -188,10 +192,12 @@ pub fn lineup_from_picks(db: &Db, team: &Team, picks: &[Pick]) -> Result<TeamSet
             .iter()
             .find(|m| m.person_id == pick.person_id)
             .map_or_else(|| pick.person_id.clone(), |m| m.handle.clone());
+        let kit = kit(db, &champion.id)?;
         players.push(PlayerSetup {
             name: handle,
             role,
-            kit: kit(db, &champion.id)?,
+            build: build(db, &champion.id, role, kit.as_ref())?,
+            kit,
             champion,
             attrs: attributes(db, &pick.person_id)?,
             spells: spells(role),
