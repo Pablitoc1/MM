@@ -1,0 +1,1 @@
+export{t as BitmapFont}from"./renderer-9tfpbgdc.js";
