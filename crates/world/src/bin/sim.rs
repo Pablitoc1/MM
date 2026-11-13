@@ -82,6 +82,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut at25: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let mut end: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let (mut wards, mut recalls) = (vec![0.0; 5], vec![0.0; 5]);
+    // Par partie : durée (min), finie sur un Nexus, victoire bleue, tours, plaques, inhibiteurs.
+    let mut whole: Vec<(f64, bool, bool, u32, u32, u32)> = Vec::new();
     let start = std::time::Instant::now();
     for k in 0..a.n {
         let r = simulate(&setup(a.seed + k));
@@ -90,6 +92,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::write(path, serde_json::to_string(&r.replay)?)?;
             }
         }
+        whole.push((
+            r.replay.duration / 60.0,
+            r.ended,
+            r.winner == 0,
+            r.teams[0].towers + r.teams[1].towers,
+            r.teams[0].plates + r.teams[1].plates,
+            r.teams[0].inhibitors + r.teams[1].inhibitors,
+        ));
         for (i, p) in r.players.iter().enumerate() {
             at10[i % 5].push(p.at10);
             at15[i % 5].push(p.at15);
@@ -106,11 +116,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut out = String::new();
     writeln!(
         out,
-        "# Rapport de calibrage : farm, combat et objets (M4)\n"
+        "# Rapport de calibrage : farm, combat, objets et bâtiments (M5a)\n"
     )?;
     writeln!(
         out,
-        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b) et objets (M4c) ; ni plan d'équipe, ni ganks, ni objectifs (M5) : une partie ne peut pas encore se finir.",
+        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b), objets (M4c), bâtiments et vagues poussées (M5a) ; ni ganks ni objectifs (M5b), ni plan d'équipe (M5c).",
         a.n,
         a.minutes,
         teams[0].tag,
@@ -248,15 +258,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (0..5)
                 .map(|r| f64::from(end[r][2 * g].kills + end[r][2 * g + 1].kills))
                 .sum::<f64>()
-                / a.minutes
+                / whole[g].0
         })
         .collect();
     let (m, sd) = mean_sd(&total);
     let real = &reference["kills_per_min"];
     writeln!(
         out,
-        "| Par minute ({} min) | {m:.2} ± {sd:.2} | {:.2} ± {:.2} |",
-        a.minutes,
+        "| Par minute de jeu | {m:.2} ± {sd:.2} | {:.2} ± {:.2} |",
         real[0].as_f64().unwrap_or(0.0),
         real[1].as_f64().unwrap_or(0.0)
     )?;
@@ -279,6 +288,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             real[0].as_f64().unwrap_or(0.0),
             real[1].as_f64().unwrap_or(0.0)
         )?;
+    }
+    writeln!(out)?;
+    writeln!(out, "## La partie entière\n")?;
+    let ended = whole.iter().filter(|g| g.1).count();
+    writeln!(
+        out,
+        "{ended} parties sur {} finies sur un Nexus avant {} min.\n",
+        whole.len(),
+        a.minutes
+    )?;
+    writeln!(out, "| Mesure | Simulé | LEC 2025 |\n|---|---|---|")?;
+    type GameMetric<'a> = (
+        &'a str,
+        &'a str,
+        fn(&(f64, bool, bool, u32, u32, u32)) -> f64,
+    );
+    let rows: [GameMetric; 5] = [
+        ("Durée (min, parties finies)", "duration_min", |g| g.0),
+        ("Tours détruites (deux équipes)", "towers", |g| {
+            f64::from(g.3)
+        }),
+        ("Plaques (deux équipes)", "turret_plates", |g| {
+            f64::from(g.4)
+        }),
+        ("Inhibiteurs (deux équipes)", "inhibitors", |g| {
+            f64::from(g.5)
+        }),
+        ("Victoires du côté bleu", "blue_win", |g| {
+            f64::from(u8::from(g.2))
+        }),
+    ];
+    for (label, key, get) in rows {
+        let v: Vec<f64> = whole
+            .iter()
+            .filter(|g| key != "duration_min" || g.1)
+            .map(get)
+            .collect();
+        let (m, sd) = mean_sd(&v);
+        let real = &reference[key];
+        let (rm, rsd) = match real {
+            serde_json::Value::Array(a) => {
+                (a[0].as_f64().unwrap_or(0.0), a[1].as_f64().unwrap_or(0.0))
+            }
+            v => (v.as_f64().unwrap_or(0.0), 0.0),
+        };
+        writeln!(out, "| {label} | {m:.2} ± {sd:.2} | {rm:.2} ± {rsd:.2} |")?;
     }
     writeln!(out)?;
     writeln!(out, "## Autres mesures\n")?;

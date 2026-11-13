@@ -200,6 +200,9 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
         if (st?.kind === 'turret') towers[e.team]++;
         break;
       }
+      case 'structure_respawn':
+        destroyed.delete(e.id);
+        break;
       case 'camp_spawn': {
         const c = camps.get(e.camp);
         if (c) camps.set(e.camp, { ...c, status: 'alive', variant: e.variant ?? null, respawnIn: null });

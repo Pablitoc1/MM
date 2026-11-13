@@ -77,6 +77,8 @@ export type MatchEvent =
   | { t: number; type: 'kill'; killer: number | null; victim: number; assists: number[]; respawnAt: number }
   /** `by` : le champion qui donne le dernier coup, s'il y en a un. */
   | { t: number; type: 'structure'; id: string; team: TeamIndex; by?: number }
+  /** Un inhibiteur revient (M5a) ; `team` : l'équipe à qui il appartient. */
+  | { t: number; type: 'structure_respawn'; id: string; team: TeamIndex }
   | { t: number; type: 'camp_spawn'; camp: string; variant?: string }
   | { t: number; type: 'camp_killed'; camp: string; team: TeamIndex; respawnAt: number | null; by?: number }
   /** `by` : le champion qui pose la balise. */

@@ -58,6 +58,8 @@ def main(folder, year):
         "dragons": both("dragons"),
         "barons": both("barons"),
         "towers": both("towers"),
+        "turret_plates": both("turretplates"),
+        "inhibitors": both("inhibitors"),
         "blue_win": round(st.mean(float(r["result"]) for g in pairs for r in g if r["side"] == "Blue"), 3),
     }
     json.dump(out, sys.stdout, ensure_ascii=False, indent=1)
