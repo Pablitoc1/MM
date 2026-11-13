@@ -215,7 +215,7 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
         const variant = variantOf.get(e.camp);
         if (e.camp === 'dragon') objectives[e.team].dragons.push(variant ?? 'Dragon');
         if (e.camp === 'baron' && variant === GRUBS) objectives[e.team].grubs += GRUBS_PER_TAKE;
-        else if (e.camp === 'baron') objectives[e.team].barons++;
+        else if (e.camp === 'baron' && variant !== HERALD) objectives[e.team].barons++;
         break;
       }
       case 'ward_placed':
@@ -311,6 +311,8 @@ export function stateAt(replay: MatchReplay, t: number, effects: Effect[] = []):
 
 /** Variante du camp du Nashor avant son apparition. */
 export const GRUBS = 'Larves du Néant';
+/** Variante du camp du Nashor entre les larves et le Nashor (M5b). */
+export const HERALD = 'Héraut de la faille';
 /** Larves tuées à chaque prise du camp (une vague de 3). */
 export const GRUBS_PER_TAKE = 3;
 

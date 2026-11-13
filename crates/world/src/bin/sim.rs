@@ -50,6 +50,16 @@ fn args() -> Args {
     a
 }
 
+/// Une partie simulée, résumée : durée (min), finie sur un Nexus, victoire bleue, et les
+/// totaux des deux équipes (tours, plaques, inhibiteurs, dragons, larves, Hérauts, Nashors,
+/// ancestraux).
+struct GameRow {
+    minutes: f64,
+    ended: bool,
+    blue_win: bool,
+    values: [f64; 8],
+}
+
 /// Moyenne et écart-type.
 fn mean_sd(v: &[f64]) -> (f64, f64) {
     let n = v.len().max(1) as f64;
@@ -82,8 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut at25: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let mut end: Vec<Vec<Snapshot>> = vec![Vec::new(); 5];
     let (mut wards, mut recalls) = (vec![0.0; 5], vec![0.0; 5]);
-    // Par partie : durée (min), finie sur un Nexus, victoire bleue, tours, plaques, inhibiteurs.
-    let mut whole: Vec<(f64, bool, bool, u32, u32, u32)> = Vec::new();
+    let mut whole: Vec<GameRow> = Vec::new();
     let start = std::time::Instant::now();
     for k in 0..a.n {
         let r = simulate(&setup(a.seed + k));
@@ -92,14 +101,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::write(path, serde_json::to_string(&r.replay)?)?;
             }
         }
-        whole.push((
-            r.replay.duration / 60.0,
-            r.ended,
-            r.winner == 0,
-            r.teams[0].towers + r.teams[1].towers,
-            r.teams[0].plates + r.teams[1].plates,
-            r.teams[0].inhibitors + r.teams[1].inhibitors,
-        ));
+        let both = |f: &dyn Fn(usize) -> u32| f64::from(f(0) + f(1));
+        let o = &r.objectives;
+        whole.push(GameRow {
+            minutes: r.replay.duration / 60.0,
+            ended: r.ended,
+            blue_win: r.winner == 0,
+            values: [
+                both(&|s| r.teams[s].towers),
+                both(&|s| r.teams[s].plates),
+                both(&|s| r.teams[s].inhibitors),
+                both(&|s| o[s].dragons.len() as u32),
+                both(&|s| o[s].grubs),
+                both(&|s| o[s].heralds),
+                both(&|s| o[s].barons),
+                both(&|s| o[s].elders),
+            ],
+        });
         for (i, p) in r.players.iter().enumerate() {
             at10[i % 5].push(p.at10);
             at15[i % 5].push(p.at15);
@@ -116,11 +134,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut out = String::new();
     writeln!(
         out,
-        "# Rapport de calibrage : farm, combat, objets et bâtiments (M5a)\n"
+        "# Rapport de calibrage : farm, combat, bâtiments et objectifs (M5b)\n"
     )?;
     writeln!(
         out,
-        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b), objets (M4c), bâtiments et vagues poussées (M5a) ; ni ganks ni objectifs (M5b), ni plan d'équipe (M5c).",
+        "{} parties de {} min, {} (bleu) contre {} (rouge), graines {} à {}. Combat en voie (M4b), objets (M4c), bâtiments (M5a), grands objectifs et ganks du jungler (M5b) ; pas encore de plan d'équipe ni de teamfights groupés (M5c).",
         a.n,
         a.minutes,
         teams[0].tag,
@@ -258,7 +276,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             (0..5)
                 .map(|r| f64::from(end[r][2 * g].kills + end[r][2 * g + 1].kills))
                 .sum::<f64>()
-                / whole[g].0
+                / whole[g].minutes
         })
         .collect();
     let (m, sd) = mean_sd(&total);
@@ -291,49 +309,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     writeln!(out)?;
     writeln!(out, "## La partie entière\n")?;
-    let ended = whole.iter().filter(|g| g.1).count();
+    let ended = whole.iter().filter(|g| g.ended).count();
     writeln!(
         out,
         "{ended} parties sur {} finies sur un Nexus avant {} min.\n",
         whole.len(),
         a.minutes
     )?;
+    writeln!(out, "Deux équipes ensemble, par partie.\n")?;
     writeln!(out, "| Mesure | Simulé | LEC 2025 |\n|---|---|---|")?;
-    type GameMetric<'a> = (
-        &'a str,
-        &'a str,
-        fn(&(f64, bool, bool, u32, u32, u32)) -> f64,
-    );
-    let rows: [GameMetric; 5] = [
-        ("Durée (min, parties finies)", "duration_min", |g| g.0),
-        ("Tours détruites (deux équipes)", "towers", |g| {
-            f64::from(g.3)
+    type GameMetric<'a> = (&'a str, &'a str, fn(&GameRow) -> f64);
+    let rows: [GameMetric; 11] = [
+        ("Durée (min, parties finies)", "duration_min", |g| {
+            g.minutes
         }),
-        ("Plaques (deux équipes)", "turret_plates", |g| {
-            f64::from(g.4)
-        }),
-        ("Inhibiteurs (deux équipes)", "inhibitors", |g| {
-            f64::from(g.5)
-        }),
+        ("Tours détruites", "towers", |g| g.values[0]),
+        ("Plaques", "turret_plates", |g| g.values[1]),
+        ("Inhibiteurs", "inhibitors", |g| g.values[2]),
+        ("Dragons élémentaires", "dragons", |g| g.values[3]),
+        ("Larves du Néant", "void_grubs", |g| g.values[4]),
+        ("Hérauts", "heralds", |g| g.values[5]),
+        ("Nashors", "barons", |g| g.values[6]),
+        ("Dragons ancestraux", "elders", |g| g.values[7]),
         ("Victoires du côté bleu", "blue_win", |g| {
-            f64::from(u8::from(g.2))
+            f64::from(u8::from(g.blue_win))
+        }),
+        ("Parties finies avant la limite", "", |g| {
+            f64::from(u8::from(g.ended))
         }),
     ];
     for (label, key, get) in rows {
         let v: Vec<f64> = whole
             .iter()
-            .filter(|g| key != "duration_min" || g.1)
+            .filter(|g| key != "duration_min" || g.ended)
             .map(get)
             .collect();
         let (m, sd) = mean_sd(&v);
-        let real = &reference[key];
-        let (rm, rsd) = match real {
-            serde_json::Value::Array(a) => {
-                (a[0].as_f64().unwrap_or(0.0), a[1].as_f64().unwrap_or(0.0))
-            }
-            v => (v.as_f64().unwrap_or(0.0), 0.0),
+        let real = match &reference[key] {
+            serde_json::Value::Array(a) => format!(
+                "{:.2} ± {:.2}",
+                a[0].as_f64().unwrap_or(0.0),
+                a[1].as_f64().unwrap_or(0.0)
+            ),
+            serde_json::Value::Number(n) => format!("{:.2}", n.as_f64().unwrap_or(0.0)),
+            _ => "1.00".to_string(),
         };
-        writeln!(out, "| {label} | {m:.2} ± {sd:.2} | {rm:.2} ± {rsd:.2} |")?;
+        writeln!(out, "| {label} | {m:.2} ± {sd:.2} | {real} |")?;
     }
     writeln!(out)?;
     writeln!(out, "## Autres mesures\n")?;
