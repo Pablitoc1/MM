@@ -35,6 +35,10 @@ seed:
 seed-draft:
     cargo run --release -p mm-data --features import --bin seed -- --draft
 
+# Refait seulement les sorts des champions (CommunityDragon, patch 26.1).
+seed-kits:
+    cargo run --release -p mm-data --features import --bin seed -- --kits
+
 # L'IA de draft rejouée sur les vraies drafts de la LEC 2025 (docs/demo/draft/rapport-ia.md).
 rapport-draft:
     cargo run --release -p mm-world --bin rapport-draft

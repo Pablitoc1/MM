@@ -7,6 +7,7 @@
 //! (note `docs/decisions/010-moteur-carte-et-farm.md`).
 
 pub mod geo;
+pub mod kit;
 pub mod map;
 pub mod player;
 pub mod replay;
@@ -15,6 +16,7 @@ pub mod rules;
 pub mod sim;
 pub mod waves;
 
+pub use kit::Kit;
 pub use player::{Attr, Attributes, ChampionStats};
 pub use replay::{Replay, Role};
 pub use rng::SimRng;

@@ -4,7 +4,7 @@
 use rusqlite::Connection;
 
 /// Version du schéma de la base. Augmente à chaque migration.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 const V1: &str = r#"
 CREATE TABLE meta (
@@ -206,10 +206,19 @@ CREATE TABLE pro_drafts (
 CREATE INDEX pro_drafts_teams ON pro_drafts (blue_team, red_team);
 "#;
 
+/// Sorts des champions (note 011) : JSON au format `mm_engine::kit::Kit`.
+pub const KITS: &str = r#"
+CREATE TABLE champion_kits (
+    champion TEXT PRIMARY KEY,        -- clé Data Dragon
+    data     TEXT NOT NULL
+);
+"#;
+
 /// Crée toutes les tables dans une base vide.
 pub fn create(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(V1)?;
     conn.execute_batch(DRAFT)?;
+    conn.execute_batch(KITS)?;
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
 }

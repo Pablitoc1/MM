@@ -10,9 +10,10 @@ workspace = true
 
 [features]
 # L'import (réseau, téléchargements) n'est compilé que pour `just seed`.
-import = ["dep:ureq", "dep:serde_json", "dep:toml", "dep:md5", "dep:csv"]
+import = ["dep:mm-engine", "dep:ureq", "dep:serde_json", "dep:toml", "dep:md5", "dep:csv"]
 
 [dependencies]
+mm-engine = { path = "../engine", optional = true }
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
