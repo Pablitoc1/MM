@@ -61,6 +61,16 @@ pub struct ChampionStats {
     pub move_speed: f64,
     /// Mana (ou énergie) de base ; 0 pour un champion sans ressource.
     pub mp: f64,
+    pub mp_per_level: f64,
+    pub armor: f64,
+    pub armor_per_level: f64,
+    pub magic_resist: f64,
+    pub magic_resist_per_level: f64,
+    /// Régénération de PV et de mana, par tranche de 5 s (comme Data Dragon).
+    pub hp_regen: f64,
+    pub hp_regen_per_level: f64,
+    pub mp_regen: f64,
+    pub mp_regen_per_level: f64,
 }
 
 impl ChampionStats {

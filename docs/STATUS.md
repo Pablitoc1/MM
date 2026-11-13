@@ -45,13 +45,15 @@ monté sur les composants d'interface préparés à part.
 Moteur seconde par seconde : carte en réseau de points, vagues, tours, camps, farm, vision et balises,
 flux de la vue 2D (note 010). `just sim KC G2 --n 100` compare les CS, l'or et l'XP à la LEC 2025
 (rapport dans `docs/demo/M3/`). L'écran Match en direct joue une partie du moteur (app : simulée à la
-demande ; navigateur : partie KC–G2 graine 1, `data/seed/public/match-demo.json`).
+demande ; navigateur : partie KC–G2 graine 3, `data/seed/public/match-demo.json`).
 Les attributs des notes M2 sont lus par le moteur (farm et mécanique en M3).
 
 ## M4 · où on en est
 M4a : les sorts des 172 champions du patch 26.1, lus dans les fichiers du jeu (CommunityDragon,
 complété par Meraki), table `champion_kits`, `just seed-kits`, contrôle de chaque sort (note 011).
-Ensuite : le combat (M4b), puis les objets et le rapport sur 1 000 parties (M4c).
+M4b : combat au quart de seconde (sorts, contrôles, tours, morts, primes, réapparition) et
+champions de la draft joués par le moteur (note 012, rapport `docs/demo/M4/rapport-combat.md`).
+Ensuite : les objets et le rapport sur 1 000 parties complètes (M4c).
 
 ## Ce qui manque
 M4 en cours (voir plus haut), puis M5 · IA d'équipe.

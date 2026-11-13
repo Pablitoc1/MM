@@ -115,6 +115,14 @@ pub enum Event {
         #[serde(skip_serializing_if = "Option::is_none")]
         by: Option<usize>,
     },
+    /// Un champion meurt. `killer` : aucun si une tour ou un monstre l'achève.
+    Kill {
+        t: f64,
+        killer: Option<usize>,
+        victim: usize,
+        assists: Vec<usize>,
+        respawn_at: f64,
+    },
     End {
         t: f64,
         winner: Side,
@@ -128,6 +136,7 @@ impl Event {
             | Event::CampSpawn { t, .. }
             | Event::CampKilled { t, .. }
             | Event::WardPlaced { t, .. }
+            | Event::Kill { t, .. }
             | Event::End { t, .. } => *t,
         }
     }

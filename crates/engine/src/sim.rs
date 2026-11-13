@@ -1,8 +1,13 @@
 //! Une partie, seconde par seconde : vagues, bâtiments, camps, et les dix champions
-//! qui farment (voies et jungle), rentrent à la base et posent des balises.
-//! M3 : pas encore de combat entre champions (M4) ni de plan d'équipe (M5).
+//! qui farment (voies et jungle), rentrent à la base, posent des balises et se battent
+//! (M4b, `combat`, au quart de seconde). Pas encore de plan d'équipe (M5).
+
+mod combat;
+
+use combat::{Fighter, Mode};
 
 use crate::geo::{Lane, Point, Side, BLUE, RED};
+use crate::kit::Kit;
 use crate::map::{self, Camp, CampKind, Nav, StructureKind};
 use crate::player::{Attr, Attributes, ChampionStats};
 use crate::replay::{
@@ -20,6 +25,8 @@ pub struct PlayerSetup {
     pub champion: ChampionStats,
     pub attrs: Attributes,
     pub spells: [String; 2],
+    /// Sorts du champion (note 011). Sans eux, il ne se bat qu'avec ses attaques.
+    pub kit: Option<Kit>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +53,8 @@ pub struct Snapshot {
     pub gold: f64,
     pub xp: f64,
     pub level: u32,
+    pub kills: u32,
+    pub deaths: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -57,6 +66,11 @@ pub struct PlayerReport {
     pub seen: f64,
     pub wards: u32,
     pub recalls: u32,
+    pub kills: u32,
+    pub deaths: u32,
+    pub assists: u32,
+    /// Dégâts infligés aux champions, après résistances.
+    pub damage: f64,
 }
 
 pub struct MatchResult {
@@ -111,6 +125,7 @@ struct Champ {
     trinket_at: f64,
     camp: Option<usize>,
     report: PlayerReport,
+    fighter: Fighter,
 }
 
 impl Champ {
@@ -138,6 +153,8 @@ impl Champ {
             gold: self.gold,
             xp: self.xp,
             level: self.level(),
+            kills: self.report.kills,
+            deaths: self.report.deaths,
         }
     }
 
@@ -147,13 +164,18 @@ impl Champ {
     }
 
     fn walk(&mut self, nav: &Nav, goal: Point, dt: f64) {
+        let speed = self.stats.move_speed;
+        self.walk_at(nav, goal, dt, speed);
+    }
+
+    fn walk_at(&mut self, nav: &Nav, goal: Point, dt: f64, speed: f64) {
         if self.path.is_empty() || self.goal.is_none_or(|g| g.dist(goal) > 700.0) {
             self.path = nav.route(self.pos, goal);
         } else if let Some(last) = self.path.last_mut() {
             *last = goal;
         }
         self.goal = Some(goal);
-        let mut step = self.stats.move_speed * dt;
+        let mut step = speed * dt;
         while step > 0.0 && !self.path.is_empty() {
             let next = self.path[0];
             let d = self.pos.dist(next);
@@ -179,73 +201,12 @@ struct Game {
     events: Vec<Event>,
     rng: SimRng,
     t: f64,
+    first_blood: bool,
 }
 
 /// Simule une partie. La même configuration (graine comprise) donne exactement la même partie.
 pub fn simulate(setup: &MatchSetup) -> MatchResult {
-    let mut rng = SimRng::new(setup.seed);
-    let mut champs = Vec::new();
-    let mut infos = Vec::new();
-    for (side, team) in setup.teams.iter().enumerate() {
-        for p in &team.players {
-            infos.push(ChampionInfo {
-                team: side,
-                role: p.role,
-                player: p.name.clone(),
-                champion: p.champion.id.clone(),
-                spells: p.spells.clone(),
-            });
-            champs.push(Champ {
-                side,
-                role: p.role,
-                stats: p.champion.clone(),
-                attrs: p.attrs,
-                pos: map::fountain(side),
-                path: Vec::new(),
-                goal: None,
-                xp: 0.0,
-                gold: rules::STARTING_GOLD,
-                gold_since_recall: 0.0,
-                cs: 0,
-                charge: 0.0,
-                recall_until: None,
-                trinket_at: 0.0,
-                camp: None,
-                report: PlayerReport::default(),
-            });
-        }
-    }
-    let camps: Vec<CampState> = map::camps()
-        .into_iter()
-        .map(|def| CampState {
-            next_spawn: def.kind.first_spawn(),
-            alive: false,
-            hp: 0.0,
-            def,
-        })
-        .collect();
-    // Premier camp de chaque jungler : son buff rouge ou son buff bleu, au hasard.
-    for c in champs.iter_mut().filter(|c| c.role == Role::Jungle) {
-        let kind = if rng.chance(0.5) {
-            CampKind::Red
-        } else {
-            CampKind::Blue
-        };
-        c.camp = camps
-            .iter()
-            .position(|k| k.def.kind == kind && k.def.side == Some(c.side));
-    }
-    let mut g = Game {
-        nav: Nav::build(),
-        lanes: Lanes::new(),
-        camps,
-        champs,
-        wards: Vec::new(),
-        next_ward: 1,
-        events: Vec::new(),
-        rng,
-        t: 0.0,
-    };
+    let (mut g, infos) = new_game(setup);
     let mut frames = Vec::new();
     let dt = rules::TICK;
     let mut winner = None;
@@ -265,11 +226,22 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
             }
         }
         g.farm(&deaths);
+        g.respawn();
+        g.decide();
         for i in 0..g.champs.len() {
-            g.think(i, dt);
+            let c = &g.champs[i];
+            if c.alive() && c.fighter.mode == Mode::Idle {
+                g.think(i, dt);
+            }
         }
+        g.combat(dt);
         g.vision(dt);
         for c in &mut g.champs {
+            c.level_up();
+            if c.alive() {
+                let at_base = c.pos.dist(map::fountain(c.side)) < 1200.0;
+                c.regen(dt, at_base);
+            }
             c.charge = (c.charge + c.attack_speed() * dt).min(2.0);
             if g.t >= rules::PASSIVE_GOLD_START {
                 c.earn(rules::PASSIVE_GOLD_PER_SEC * dt);
@@ -323,6 +295,84 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
         },
         players,
     }
+}
+
+/// La partie à 0:00 : champions à la fontaine, camps en attente.
+fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
+    let mut rng = SimRng::new(setup.seed);
+    let mut champs = Vec::new();
+    let mut infos = Vec::new();
+    for (side, team) in setup.teams.iter().enumerate() {
+        for p in &team.players {
+            infos.push(ChampionInfo {
+                team: side,
+                role: p.role,
+                player: p.name.clone(),
+                champion: p.champion.id.clone(),
+                spells: p.spells.clone(),
+            });
+            champs.push(Champ {
+                side,
+                role: p.role,
+                stats: p.champion.clone(),
+                attrs: p.attrs,
+                pos: map::fountain(side),
+                path: Vec::new(),
+                goal: None,
+                xp: 0.0,
+                gold: rules::STARTING_GOLD,
+                gold_since_recall: 0.0,
+                cs: 0,
+                charge: 0.0,
+                recall_until: None,
+                trinket_at: 0.0,
+                camp: None,
+                report: PlayerReport::default(),
+                fighter: Fighter {
+                    has_flash: p.spells.iter().any(|s| s == "SummonerFlash"),
+                    ..Fighter::new(p.kit.clone())
+                },
+            });
+        }
+    }
+    for c in &mut champs {
+        c.level_up();
+        c.fighter.hp = c.max_hp();
+        c.fighter.mana = c.max_mana();
+    }
+    let camps: Vec<CampState> = map::camps()
+        .into_iter()
+        .map(|def| CampState {
+            next_spawn: def.kind.first_spawn(),
+            alive: false,
+            hp: 0.0,
+            def,
+        })
+        .collect();
+    // Premier camp de chaque jungler : son buff rouge ou son buff bleu, au hasard.
+    for c in champs.iter_mut().filter(|c| c.role == Role::Jungle) {
+        let kind = if rng.chance(0.5) {
+            CampKind::Red
+        } else {
+            CampKind::Blue
+        };
+        c.camp = camps
+            .iter()
+            .position(|k| k.def.kind == kind && k.def.side == Some(c.side));
+    }
+    let g = Game {
+        nav: Nav::build(),
+        lanes: Lanes::new(),
+        camps,
+        champs,
+        wards: Vec::new(),
+        next_ward: 1,
+        events: Vec::new(),
+        rng,
+        t: 0.0,
+        first_blood: false,
+    };
+    (g, infos)
 }
 
 impl Game {
@@ -427,9 +477,19 @@ impl Game {
                 c.pos = map::fountain(c.side);
                 c.path.clear();
                 c.recall_until = None;
+                c.fighter.mode = Mode::Idle;
+                // La fontaine soigne en quelques secondes : on repart plein.
+                c.fighter.hp = c.max_hp();
+                c.fighter.mana = c.max_mana();
                 c.gold_since_recall = 0.0;
                 c.report.recalls += 1;
             }
+            return;
+        }
+        // Trop peu de PV pour rester : retour à la base (pas depuis la fontaine).
+        let c = &self.champs[i];
+        if c.fighter.hp < 0.35 * c.max_hp() && c.pos.dist(map::fountain(c.side)) > 1200.0 {
+            self.start_recall(i);
             return;
         }
         if self.champs[i].role == Role::Jungle {
@@ -499,12 +559,16 @@ impl Game {
                 enemy_turret = enemy_turret.min(d);
             }
         }
-        let back = match (c.role, c.stats.is_ranged()) {
+        let mut back = match (c.role, c.stats.is_ranged()) {
             (Role::Support, _) => 550.0,
             (_, true) => 450.0,
             _ => 200.0,
         }; // estimé
-           // Il se place derrière le point de contact des vagues (le front adverse s'il est seul).
+           // Menacé par son vis-à-vis : il joue prudemment, plus loin de la vague (perd des sbires).
+        if self.outmatched(i) {
+            back += 350.0; // estimé
+        }
+        // Il se place derrière le point de contact des vagues (le front adverse s'il est seul).
         let enemy_front = self
             .lanes
             .waves
@@ -618,27 +682,29 @@ impl Game {
         self.wards.retain(|w| w.expires > t);
         for i in 0..self.champs.len() {
             let me = &self.champs[i];
+            if !me.alive() {
+                continue;
+            }
             let enemy = 1 - me.side;
             let p = me.pos;
-            let seen = self
-                .champs
-                .iter()
-                .any(|o| o.side == enemy && o.pos.dist(p) <= rules::CHAMPION_SIGHT)
-                || self
+            let seen =
+                self.champs.iter().any(|o| {
+                    o.side == enemy && o.alive() && o.pos.dist(p) <= rules::CHAMPION_SIGHT
+                }) || self
                     .lanes
                     .waves
                     .iter()
                     .any(|w| w.side == enemy && w.pos().dist(p) <= rules::MINION_SIGHT)
-                || self.lanes.buildings.iter().any(|b| {
-                    b.def.side == enemy
-                        && b.alive()
-                        && b.def.kind == StructureKind::Turret
-                        && b.def.pos.dist(p) <= rules::TURRET_SIGHT
-                })
-                || self
-                    .wards
-                    .iter()
-                    .any(|w| w.side == enemy && w.pos.dist(p) <= rules::WARD_SIGHT);
+                    || self.lanes.buildings.iter().any(|b| {
+                        b.def.side == enemy
+                            && b.alive()
+                            && b.def.kind == StructureKind::Turret
+                            && b.def.pos.dist(p) <= rules::TURRET_SIGHT
+                    })
+                    || self
+                        .wards
+                        .iter()
+                        .any(|w| w.side == enemy && w.pos.dist(p) <= rules::WARD_SIGHT);
             if seen {
                 self.champs[i].report.seen += dt;
             }
@@ -657,9 +723,10 @@ impl Game {
                 .map(|c| ChampionFrame {
                     x: c.pos.x.round(),
                     y: c.pos.y.round(),
-                    hp: 1.0,
-                    resource: (c.stats.mp > 0.0).then_some(1.0),
-                    alive: true,
+                    hp: (c.fighter.hp / c.max_hp()).clamp(0.0, 1.0),
+                    resource: (c.stats.mp > 0.0)
+                        .then(|| (c.fighter.mana / c.max_mana()).clamp(0.0, 1.0)),
+                    alive: c.alive(),
                     level: c.level(),
                     cs: c.cs,
                     gold: c.gold.round(),
@@ -698,6 +765,15 @@ mod tests {
             attack_range: if ranged { 550.0 } else { 175.0 },
             move_speed: 340.0,
             mp: 300.0,
+            mp_per_level: 30.0,
+            armor: 30.0,
+            armor_per_level: 4.5,
+            magic_resist: 30.0,
+            magic_resist_per_level: 1.3,
+            hp_regen: 6.0,
+            hp_regen_per_level: 0.6,
+            mp_regen: 8.0,
+            mp_regen_per_level: 0.8,
         }
     }
 
@@ -716,6 +792,7 @@ mod tests {
                     ),
                     attrs: Attributes::default(),
                     spells: ["SummonerFlash".into(), "SummonerTeleport".into()],
+                    kit: None,
                 })
                 .collect(),
         }

@@ -48,7 +48,7 @@ draft-demo:
     cargo run --release -p mm-world --bin draft-demo
 
 # Simule des parties sans interface et les compare à la LEC 2025.
-# Exemple : just sim KC G2 --n 100 --report docs/demo/M3/rapport-farm.md --replay partie.json
+# Exemple : just sim KC G2 --n 1000 --report docs/demo/M4/rapport-combat.md --replay partie.json
 sim *args:
     cargo run --release -q -p mm-world --bin sim -- {{args}}
 

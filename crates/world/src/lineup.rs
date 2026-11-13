@@ -1,12 +1,14 @@
 //! Prépare un match pour le moteur à partir de la base : les cinq titulaires de chaque club,
 //! leur champion et ses stats Data Dragon.
 //!
-//! En attendant la draft (M7), chaque joueur prend son champion le plus joué en 2025
-//! qui n'est pas déjà pris. Les attributs viennent des notes M2 (note 007) ; un attribut absent
+//! Avec une draft (M7), chaque joueur prend le champion choisi (`lineup_from_picks`).
+//! Sans draft, chaque joueur prend son champion le plus joué en 2025 qui n'est pas déjà pris. Les attributs viennent des notes M2 (note 007) ; un attribut absent
 //! vaut la moyenne LEC.
 
 use mm_data::read::{Db, Team};
 use mm_engine::{Attributes, ChampionStats, PlayerSetup, Role, TeamSetup};
+
+use crate::draft::Pick;
 
 const ROLES: [(&str, Role); 5] = [
     ("Top", Role::Top),
@@ -69,6 +71,15 @@ pub fn champion_stats(db: &Db, id: &str) -> Result<Option<ChampionStats>, Lineup
         attack_range: f("attackrange")?,
         move_speed: f("movespeed")?,
         mp: f("mp")?,
+        mp_per_level: f("mpperlevel")?,
+        armor: f("armor")?,
+        armor_per_level: f("armorperlevel")?,
+        magic_resist: f("spellblock")?,
+        magic_resist_per_level: f("spellblockperlevel")?,
+        hp_regen: f("hpregen")?,
+        hp_regen_per_level: f("hpregenperlevel")?,
+        mp_regen: f("mpregen")?,
+        mp_regen_per_level: f("mpregenperlevel")?,
     }))
 }
 
@@ -145,12 +156,45 @@ pub fn lineup(db: &Db, team: &Team, taken: &mut Vec<String>) -> Result<TeamSetup
         }
         let champion = champion.ok_or_else(|| LineupError::BadChampion(FALLBACK[i].into()))?;
         taken.push(champion.id.clone());
+        let kit = kit(db, &champion.id)?;
         players.push(PlayerSetup {
             name: p.handle.clone(),
             role: *role,
             champion,
             attrs: attributes(db, &p.person_id)?,
             spells: spells(*role),
+            kit,
+        });
+    }
+    Ok(TeamSetup {
+        tag: team.short.clone().unwrap_or_else(|| team.id.clone()),
+        name: team.id.clone(),
+        players,
+    })
+}
+
+/// Les cinq titulaires d'un club avec les champions choisis pendant la draft.
+pub fn lineup_from_picks(db: &Db, team: &Team, picks: &[Pick]) -> Result<TeamSetup, LineupError> {
+    let roster = db.roster(&team.id)?;
+    let mut players = Vec::new();
+    for (name, role) in ROLES {
+        let pick = picks
+            .iter()
+            .find(|p| p.role == role)
+            .ok_or_else(|| LineupError::MissingRole(team.id.clone(), name))?;
+        let champion = champion_stats(db, &pick.champion)?
+            .ok_or_else(|| LineupError::BadChampion(pick.champion.clone()))?;
+        let handle = roster
+            .iter()
+            .find(|m| m.person_id == pick.person_id)
+            .map_or_else(|| pick.person_id.clone(), |m| m.handle.clone());
+        players.push(PlayerSetup {
+            name: handle,
+            role,
+            kit: kit(db, &champion.id)?,
+            champion,
+            attrs: attributes(db, &pick.person_id)?,
+            spells: spells(role),
         });
     }
     Ok(TeamSetup {
@@ -168,6 +212,19 @@ pub fn lec_match(
     seed: u64,
     minutes: f64,
 ) -> Result<mm_engine::MatchSetup, LineupError> {
+    drafted_match(db, blue, red, None, seed, minutes)
+}
+
+/// Comme `lec_match`, avec les champions d'une draft terminée (bleu, rouge) si elle est fournie.
+/// La draft est ignorée si elle ne concerne pas ces deux clubs.
+pub fn drafted_match(
+    db: &Db,
+    blue: &str,
+    red: &str,
+    draft: Option<(&str, &[Pick], &str, &[Pick])>,
+    seed: u64,
+    minutes: f64,
+) -> Result<mm_engine::MatchSetup, LineupError> {
     let lec = db.teams("LEC")?;
     let find = |tag: &str| {
         lec.iter()
@@ -179,11 +236,17 @@ pub fn lec_match(
             })
             .ok_or_else(|| LineupError::MissingRole(tag.into(), "club"))
     };
-    let mut taken = Vec::new();
-    let teams = [
-        lineup(db, find(blue)?, &mut taken)?,
-        lineup(db, find(red)?, &mut taken)?,
-    ];
+    let (blue, red) = (find(blue)?, find(red)?);
+    let teams = match draft {
+        Some((b, picks_b, r, picks_r)) if b == blue.id && r == red.id => [
+            lineup_from_picks(db, blue, picks_b)?,
+            lineup_from_picks(db, red, picks_r)?,
+        ],
+        _ => {
+            let mut taken = Vec::new();
+            [lineup(db, blue, &mut taken)?, lineup(db, red, &mut taken)?]
+        }
+    };
     Ok(mm_engine::MatchSetup {
         seed,
         patch: "26.1".into(),
