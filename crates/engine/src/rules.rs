@@ -35,6 +35,8 @@ pub enum MinionKind {
     Melee,
     Caster,
     Cannon,
+    /// Super sbire : remplace le canon d'une voie dont l'inhibiteur adverse est tombé.
+    Super,
 }
 
 pub struct MinionStats {
@@ -79,6 +81,15 @@ pub fn minion(kind: MinionKind) -> MinionStats {
             xp: 93.6,
             turret_shot: 0.14,
         },
+        MinionKind::Super => MinionStats {
+            hp: 1500.0,
+            hp_per_upgrade: 200.0,
+            ad: 230.0,
+            attack_speed: 0.85,
+            gold: 60.0,
+            xp: 97.0,
+            turret_shot: 0.07,
+        },
     }
 }
 
@@ -88,6 +99,35 @@ pub fn minion_upgrades(t: f64) -> f64 {
 
 /// Les sbires infligent moins de dégâts aux bâtiments.
 pub const MINION_VS_STRUCTURE: f64 = 0.5; // estimé
+
+// ---- Bâtiments (M5a, note 015) ----
+/// Un inhibiteur détruit revient au bout de 5 minutes.
+pub const INHIBITOR_RESPAWN: f64 = 300.0; // estimé (wiki)
+/// Les plaques des tours extérieures tombent à 14:00.
+pub const PLATES_END: f64 = 840.0; // estimé (wiki)
+/// Cinq plaques par tour extérieure, une tous les 1 000 PV perdus.
+pub const PLATES: u8 = 5; // estimé (wiki)
+pub const PLATE_HP: f64 = 1000.0; // estimé (wiki)
+/// Or d'une plaque, partagé entre les champions adverses proches.
+pub const PLATE_GOLD: f64 = 250.0; // estimé (wiki, saison 2025)
+/// Distance à laquelle un champion touche sa part de l'or d'un bâtiment.
+pub const STRUCTURE_GOLD_RANGE: f64 = 1500.0; // estimé
+/// Armure d'un bâtiment contre les attaques des champions.
+pub const STRUCTURE_ARMOR: f64 = 40.0; // estimé (wiki : 40 à 55 selon la tour)
+
+/// Or d'un bâtiment détruit : (part locale partagée entre les champions proches, or pour chaque
+/// membre de l'équipe). estimé (wiki, saison 2025).
+pub fn structure_gold(id: &str, kind: crate::map::StructureKind) -> (f64, f64) {
+    use crate::map::StructureKind::*;
+    match kind {
+        Turret if id.contains("outer") => (250.0, 0.0),
+        Turret if id.contains("inner") => (300.0, 50.0),
+        Turret if id.contains("inhib") => (250.0, 50.0),
+        Turret => (0.0, 50.0),
+        Inhibitor => (0.0, 50.0),
+        Nexus => (0.0, 0.0),
+    }
+}
 
 // ---- Champions ----
 pub const STARTING_GOLD: f64 = 500.0; // estimé (wiki)

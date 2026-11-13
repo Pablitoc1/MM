@@ -84,12 +84,19 @@ pub struct Frame {
     rename_all_fields = "camelCase"
 )]
 pub enum Event {
+    /// Un bâtiment détruit. `team` : l'équipe qui l'a détruit (comme la vue le lit).
     Structure {
         t: f64,
         id: String,
         team: Side,
         #[serde(skip_serializing_if = "Option::is_none")]
         by: Option<usize>,
+    },
+    /// Un inhibiteur revient (M5a). `team` : l'équipe à qui il appartient.
+    StructureRespawn {
+        t: f64,
+        id: String,
+        team: Side,
     },
     CampSpawn {
         t: f64,
@@ -133,6 +140,7 @@ impl Event {
     pub fn t(&self) -> f64 {
         match self {
             Event::Structure { t, .. }
+            | Event::StructureRespawn { t, .. }
             | Event::CampSpawn { t, .. }
             | Event::CampKilled { t, .. }
             | Event::WardPlaced { t, .. }

@@ -4,7 +4,10 @@
 
 mod combat;
 
+mod siege;
+
 use combat::{Fighter, Mode};
+pub use siege::TeamReport;
 
 use crate::geo::{Lane, Point, Side, BLUE, RED};
 use crate::item::{Inventory, Item};
@@ -78,12 +81,19 @@ pub struct PlayerReport {
     pub assists: u32,
     /// Dégâts infligés aux champions, après résistances.
     pub damage: f64,
+    /// Dégâts infligés aux bâtiments.
+    pub structure_damage: f64,
 }
 
 pub struct MatchResult {
     pub replay: Replay,
     /// Dans l'ordre des champions du flux (0 à 4 bleu, 5 à 9 rouge).
     pub players: Vec<PlayerReport>,
+    /// Bâtiments pris par chaque équipe.
+    pub teams: [TeamReport; 2],
+    pub winner: Side,
+    /// La partie s'est finie sur un Nexus (sinon : limite de durée atteinte).
+    pub ended: bool,
 }
 
 // ---- Comportements (estimé, calés sur le rapport de calibrage) ----
@@ -98,6 +108,12 @@ const LAST_HIT_RANGE: f64 = 1100.0; // estimé
 const JUNGLE_CLEAR: f64 = 3.6;
 /// Or gagné depuis le dernier retour au-delà duquel un joueur cherche à rentrer.
 const RECALL_GOLD: f64 = 1300.0; // estimé (prix d'un premier objet)
+/// Un champion à moins de cette distance d'une vague qui menace sa base vient la nettoyer.
+const BASE_DEFENSE_RANGE: f64 = 6000.0; // estimé
+/// Dominé près de sa tour : il recule de cette distance derrière elle et la laisse tomber.
+const CONCEDE_BACK: f64 = 1300.0; // estimé
+/// Distance au-delà de laquelle le vis-à-vis ne gêne plus : on pousse la vague.
+const OPPONENT_AWAY: f64 = 2000.0; // estimé
 /// Écart d'or qui donne environ 75 % de chances de victoire.
 const WIN_GOLD_SCALE: f64 = 3000.0; // estimé, à caler en M5
 
@@ -225,6 +241,12 @@ struct Game {
     rng: SimRng,
     t: f64,
     first_blood: bool,
+    winner: Option<Side>,
+    /// Plaques déjà tombées, par bâtiment.
+    plates_taken: Vec<u8>,
+    /// Dernier champion à avoir frappé chaque bâtiment, et quand.
+    last_structure_hit: Vec<Option<(usize, f64)>>,
+    teams: [TeamReport; 2],
 }
 
 /// Simule une partie. La même configuration (graine comprise) donne exactement la même partie.
@@ -232,23 +254,14 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
     let (mut g, infos) = new_game(setup);
     let mut frames = Vec::new();
     let dt = rules::TICK;
-    let mut winner = None;
     while g.t <= setup.duration + 1e-9 {
         g.spawn_camps();
         let (deaths, destroyed) = g.lanes.step(g.t, dt);
         for b in destroyed {
-            let def = &g.lanes.buildings[b].def;
-            g.events.push(Event::Structure {
-                t: g.t,
-                id: def.id.to_string(),
-                team: def.side,
-                by: None,
-            });
-            if def.kind == StructureKind::Nexus {
-                winner = Some(1 - def.side);
-            }
+            g.structure_destroyed(b);
         }
-        g.farm(&deaths);
+        g.structures_respawned();
+        g.farm(&deaths, None);
         g.respawn();
         g.decide();
         for i in 0..g.champs.len() {
@@ -258,6 +271,7 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
             }
         }
         g.combat(dt);
+        g.plates();
         g.vision(dt);
         for c in &mut g.champs {
             c.level_up();
@@ -283,13 +297,14 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
             }
         }
         frames.push(g.frame());
-        if winner.is_some() {
+        if g.winner.is_some() {
             break;
         }
         g.t += dt;
     }
     let end = frames.last().map_or(0.0, |f| f.t);
-    let winner = winner.unwrap_or_else(|| {
+    let ended = g.winner.is_some();
+    let winner = g.winner.unwrap_or_else(|| {
         if g.team_gold(BLUE) >= g.team_gold(RED) {
             BLUE
         } else {
@@ -323,6 +338,9 @@ pub fn simulate(setup: &MatchSetup) -> MatchResult {
             events: g.events,
         },
         players,
+        teams: g.teams,
+        winner,
+        ended,
     }
 }
 
@@ -392,7 +410,7 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
             .iter()
             .position(|k| k.def.kind == kind && k.def.side == Some(c.side));
     }
-    let g = Game {
+    let mut g = Game {
         nav: Nav::build(),
         lanes: Lanes::new(),
         camps,
@@ -403,7 +421,13 @@ fn new_game(setup: &MatchSetup) -> (Game, Vec<ChampionInfo>) {
         rng,
         t: 0.0,
         first_blood: false,
+        winner: None,
+        plates_taken: Vec::new(),
+        last_structure_hit: Vec::new(),
+        teams: [TeamReport::default(); 2],
     };
+    g.plates_taken = vec![0; g.lanes.buildings.len()];
+    g.last_structure_hit = vec![None; g.lanes.buildings.len()];
     (g, infos)
 }
 
@@ -449,7 +473,8 @@ impl Game {
 
     /// Les sbires qui meurent donnent de l'XP aux champions proches, et de l'or au champion
     /// qui réussit le dernier coup. Sinon, le sbire est perdu.
-    fn farm(&mut self, deaths: &[Death]) {
+    /// `killer` : le champion qui a tué ces sbires en poussant la vague (il les prend tous).
+    fn farm(&mut self, deaths: &[Death], killer: Option<usize>) {
         for d in deaths {
             let enemy = 1 - d.side;
             let stats = rules::minion(d.kind);
@@ -466,6 +491,12 @@ impl Game {
             };
             for &i in &near {
                 self.champs[i].xp += stats.xp * share;
+            }
+            if let Some(k) = killer {
+                let c = &mut self.champs[k];
+                c.cs += 1;
+                c.earn(stats.gold);
+                continue;
             }
             // Le joueur de la voie d'abord, puis son support. Le jungler ne farme pas les voies en M3.
             let mut order: Vec<usize> = near
@@ -524,6 +555,16 @@ impl Game {
         if c.fighter.hp < 0.35 * c.max_hp() && c.pos.dist(map::fountain(c.side)) > 1200.0 {
             self.start_recall(i);
             return;
+        }
+        // Des sbires adverses au pied de la base : on va les nettoyer (M5a, note 015).
+        if let Some((lane, at)) = self.base_threat(self.champs[i].side) {
+            let c = &self.champs[i];
+            if c.pos.dist(at) < BASE_DEFENSE_RANGE || c.role.lane() == Some(lane) {
+                if !self.push_wave(i, lane, dt) {
+                    self.champs[i].walk(&self.nav, at, dt);
+                }
+                return;
+            }
         }
         if self.champs[i].role == Role::Jungle {
             self.jungle(i, dt);
@@ -613,9 +654,14 @@ impl Game {
             (Some(o), Some(e)) => Some(o.max(e)),
             (o, e) => o.or(e),
         };
-        let d = front
+        let mut d = front
             .map_or(own_turret - 300.0, |f| f - back)
             .min(enemy_turret - 900.0);
+        // Seul contre plus fort autour de sa tour : il la laisse et attend derrière (M5a).
+        let outnumbered = self.outmatched(i);
+        if outnumbered {
+            d = d.min(own_turret - CONCEDE_BACK);
+        }
         let goal = lane.point_at(side, d);
         // Retour à la base : assez d'or et aucune vague adverse à farmer tout près.
         let enemy_close = self
@@ -635,6 +681,34 @@ impl Game {
                 .any(|o| o.side == side && o.role == Role::Bot && o.recall_until.is_some());
         if follows || (c.role != Role::Support && wants && self.rng.chance(0.3)) {
             self.start_recall(i);
+            return;
+        }
+        // Pousser la vague : son vis-à-vis n'est pas là, ou il veut rentrer à la base après
+        // (les pros poussent avant de rentrer), ou les plaques sont tombées. estimé
+        let opponent_away = !self.champs.iter().any(|o| {
+            o.side != side
+                && o.role.lane() == Some(lane)
+                && o.alive()
+                && o.recall_until.is_none()
+                && o.pos.dist(c.pos) < OPPONENT_AWAY
+        });
+        let push = opponent_away
+            || c.gold_since_recall >= 0.8 * RECALL_GOLD
+            || self.t >= rules::PLATES_END;
+        if push && c.role != Role::Support && self.push_wave(i, lane, dt) {
+            return;
+        }
+        // Sa vague est au pied d'un bâtiment adverse et personne ne le défend : il le frappe.
+        if let Some(b) = self.siege_target(i, lane) {
+            let c = &self.champs[i];
+            let bpos = self.lanes.buildings[b].def.pos;
+            let reach = c.stats.attack_range + 150.0; // estimé (rayon du bâtiment)
+            if c.pos.dist(bpos) <= reach {
+                self.hit_structure(i, b, dt);
+            } else {
+                let spot = bpos.toward(c.pos, c.stats.attack_range);
+                self.champs[i].walk(&self.nav, spot, dt);
+            }
             return;
         }
         self.champs[i].walk(&self.nav, goal, dt);

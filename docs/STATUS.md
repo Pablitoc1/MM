@@ -3,9 +3,9 @@
 Mis à jour à la fin de chaque jalon.
 
 ## Jalon en cours
-M4 · Combat : lancé avec le « go M4 » de Yahia le 11 novembre 2026. M3 est fusionné (PR #15 à #17)
-et attend sa validation.
-Dernier jalon terminé : M2 · Notes des joueurs, validé par Yahia le 11 novembre 2026 (PR #12 et #13).
+M5 · IA d'équipe et objectifs : lancé le 13 novembre 2026 (« oui continue je valide » de Yahia),
+en trois PR : M5a bâtiments, M5b objectifs et ganks, M5c plan d'équipe et calibrage.
+Dernier jalon terminé : M4 · Combat, validé par Yahia le 13 novembre 2026 (PR #22, #23 et #24).
 
 ## Ce qui marche
 - Workspace Rust : `mm-data`, `mm-engine`, `mm-world`, `mm-app` (Tauri 2).
@@ -60,8 +60,15 @@ rapport sur 1 000 parties de 35 min `docs/demo/M4/rapport-objets.md`).
 ils viendront des ganks, des combats d'équipe et des objectifs de M5. Une partie ne peut pas encore
 se finir (les champions n'attaquent pas les bâtiments) : la durée attend M5.
 
+## M5 · où on en est
+M5a : les champions poussent leur vague et frappent les bâtiments derrière elle, plaques et or des
+bâtiments, inhibiteurs qui reviennent après 5 min et super sbires, défense de la base, fin de partie
+sur le Nexus (note 015, rapport `docs/demo/M5/rapport-batiments.md`). Tours (11,0 contre 12,4),
+plaques (5,9 contre 8,0) et kills (0,73 par minute contre 0,81) sont proches de la LEC ; la durée ne
+l'est pas encore (17 % des parties finies avant 60 min) : il manque le plan d'équipe (M5c).
+
 ## Ce qui manque
-M4 en cours (voir plus haut), puis M5 · IA d'équipe.
+M5b (dragons, larves, Nashor, ganks), M5c (plan d'équipe, combats d'équipe, calibrage final).
 Pistes ouvertes : photos des autres ligues ; palmarès (titres) dans les notes ; carrière à d'autres
 postes (Rekkles noté sur ses seules parties de support) ; les notes n'évoluent pas encore (M10).
 

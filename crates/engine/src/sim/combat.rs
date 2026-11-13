@@ -160,7 +160,7 @@ impl Champ {
     }
 
     /// Recharge réduite par l'accélération de compétence : × 100 / (100 + AC).
-    fn haste_factor(&self) -> f64 {
+    pub(super) fn haste_factor(&self) -> f64 {
         100.0 / (100.0 + self.inv.stats.ability_haste)
     }
 

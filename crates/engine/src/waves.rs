@@ -55,6 +55,8 @@ pub struct Building {
     /// Distance le long de chaque voie depuis le nexus adverse (pour les vagues qui l'attaquent).
     along: [f64; 3],
     shot_charge: f64,
+    /// Un inhibiteur détruit revient à cet instant.
+    pub respawn_at: Option<f64>,
 }
 
 impl Building {
@@ -66,11 +68,18 @@ impl Building {
     fn on_lane(&self, lane: Lane) -> bool {
         self.def.lane.is_none_or(|l| l == lane)
     }
+
+    /// Distance le long de la voie depuis le nexus de ceux qui l'attaquent.
+    pub fn along(&self, lane: Lane) -> f64 {
+        self.along[lane.index()]
+    }
 }
 
 pub struct Lanes {
     pub waves: Vec<Wave>,
     pub buildings: Vec<Building>,
+    /// Inhibiteurs revenus pendant le dernier pas (index).
+    pub respawned: Vec<usize>,
     next_id: u32,
     wave_number: u32,
 }
@@ -92,12 +101,14 @@ impl Lanes {
                     def,
                     along,
                     shot_charge: 0.0,
+                    respawn_at: None,
                 }
             })
             .collect();
         Lanes {
             waves: Vec::new(),
             buildings,
+            respawned: Vec::new(),
             next_id: 1,
             wave_number: 0,
         }
@@ -105,7 +116,7 @@ impl Lanes {
 
     /// Un bâtiment est vulnérable si ceux qui le protègent sur sa voie sont tombés.
     /// Simplifié en M3 : le premier bâtiment debout de la voie, depuis l'adversaire.
-    fn next_target(&self, side: Side, lane: Lane, d: f64) -> Option<usize> {
+    pub fn next_target(&self, side: Side, lane: Lane, d: f64) -> Option<usize> {
         let mut best: Option<usize> = None;
         for (i, b) in self.buildings.iter().enumerate() {
             if b.def.side == side || !b.alive() || !b.on_lane(lane) {
@@ -121,6 +132,13 @@ impl Lanes {
 
     /// Avance d'un pas. Renvoie les sbires morts et les bâtiments détruits (index).
     pub fn step(&mut self, t: f64, dt: f64) -> (Vec<Death>, Vec<usize>) {
+        for (i, b) in self.buildings.iter_mut().enumerate() {
+            if b.respawn_at.is_some_and(|r| t >= r) {
+                b.respawn_at = None;
+                b.hp = b.def.max_hp;
+                self.respawned.push(i);
+            }
+        }
         self.spawn(t);
         let mut deaths = Vec::new();
         let mut destroyed = Vec::new();
@@ -179,7 +197,7 @@ impl Lanes {
                         // La tour extérieure tient jusqu'à 14:00 grâce aux plaques (simplifié).
                         bld.hp -= dmg;
                         if !bld.alive() {
-                            bld.hp = 0.0;
+                            self.destroy(b, t);
                             destroyed.push(b);
                         }
                     }
@@ -209,7 +227,30 @@ impl Lanes {
         (deaths, destroyed)
     }
 
-    fn hit_wave(&mut self, i: usize, mut dmg: f64, deaths: &mut Vec<Death>) {
+    /// Un bâtiment tombe : PV à zéro, et un inhibiteur reviendra.
+    pub fn destroy(&mut self, b: usize, t: f64) {
+        let bld = &mut self.buildings[b];
+        bld.hp = 0.0;
+        if bld.def.kind == StructureKind::Inhibitor {
+            bld.respawn_at = Some(t + rules::INHIBITOR_RESPAWN);
+        }
+    }
+
+    /// Inhibiteurs de l'équipe `side` tombés : sur une voie, et en tout.
+    fn inhibitors_down(&self, side: Side, lane: Lane) -> (bool, usize) {
+        let down = |b: &&Building| {
+            b.def.side == side && b.def.kind == StructureKind::Inhibitor && !b.alive()
+        };
+        let total = self.buildings.iter().filter(down).count();
+        let here = self
+            .buildings
+            .iter()
+            .filter(down)
+            .any(|b| b.def.lane == Some(lane));
+        (here, total)
+    }
+
+    pub fn hit_wave(&mut self, i: usize, mut dmg: f64, deaths: &mut Vec<Death>) {
         let w = &mut self.waves[i];
         let pos = w.pos();
         while dmg > 0.0 && !w.minions.is_empty() {
@@ -260,9 +301,23 @@ impl Lanes {
         for side in [0, 1] {
             for lane in Lane::ALL {
                 let mut minions = Vec::new();
-                for kind in [MinionKind::Melee, MinionKind::Cannon, MinionKind::Caster] {
+                // Inhibiteur adverse tombé sur cette voie : un super sbire à la place du canon,
+                // deux si l'adversaire a perdu au moins deux inhibiteurs. estimé (wiki)
+                let (open, total) = self.inhibitors_down(1 - side, lane);
+                let supers = match (open, total) {
+                    (false, _) => 0,
+                    (true, 1) => 1,
+                    (true, _) => 2,
+                };
+                for kind in [
+                    MinionKind::Super,
+                    MinionKind::Melee,
+                    MinionKind::Cannon,
+                    MinionKind::Caster,
+                ] {
                     let n = match kind {
-                        MinionKind::Cannon => usize::from(cannon),
+                        MinionKind::Super => supers,
+                        MinionKind::Cannon => usize::from(cannon && supers == 0),
                         _ => 3,
                     };
                     for _ in 0..n {
@@ -287,7 +342,7 @@ impl Lanes {
 
 fn front_rank(kind: MinionKind) -> u8 {
     match kind {
-        MinionKind::Melee => 0,
+        MinionKind::Super | MinionKind::Melee => 0,
         MinionKind::Cannon => 1,
         MinionKind::Caster => 2,
     }
